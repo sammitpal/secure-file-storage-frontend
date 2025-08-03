@@ -1,264 +1,376 @@
-import React, { useState } from 'react';
-import styled, { keyframes } from 'styled-components';
-import { motion } from 'framer-motion';
-import { 
-  FiShield, 
-  FiLogOut, 
-  FiUser,
-  FiMenu,
-  FiX
-} from 'react-icons/fi';
-import { theme } from '../styles/GlobalStyles.js';
+import React, { useState, useCallback } from 'react';
+import styled from 'styled-components';
+import { FiShield, FiUser, FiHardDrive, FiSettings, FiMenu, FiX, FiLogOut, FiSun, FiMoon } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useTheme } from '../contexts/ThemeContext.jsx';
 
-// Animations
-const shimmerGlow = keyframes`
-  0% { 
-    background-position: -200% center;
-  }
-  100% { 
-    background-position: 200% center;
-  }
-`;
-
-const NavbarContainer = styled(motion.nav)`
-  position: sticky;
+const NavbarContainer = styled.nav`
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: ${props => props.theme.colors.surface};
+  border-bottom: 1px solid ${props => props.theme.colors.border};
   z-index: 1000;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: ${theme.shadows.lg};
+  display: flex;
+  align-items: center;
+  padding: 0 ${props => props.theme.spacing.xl};
+  transition: all 0.3s ease;
   
-  &::before {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, ${theme.colors.primary}, transparent);
-    opacity: 0.6;
+  @media (max-width: ${props => props.theme.breakpoints.md}) {
+    padding: 0 ${props => props.theme.spacing.lg};
   }
 `;
 
-const NavbarContent = styled.div`
-  padding: 0 ${theme.spacing.xl};
+const NavContent = styled.div`
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 70px;
-  width: 100%;
-  
-  @media (max-width: ${theme.breakpoints.md}) {
-    padding: 0 ${theme.spacing.lg};
-  }
 `;
 
-const Brand = styled.div`
+const Logo = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.md};
+  gap: ${props => props.theme.spacing.md};
   font-size: 1.5rem;
-  font-weight: 800;
-  color: ${theme.colors.primary};
-  letter-spacing: -0.025em;
-  flex-shrink: 0;
+  font-weight: 700;
+  color: ${props => props.theme.colors.primary};
   
   .icon {
     font-size: 2rem;
-    filter: drop-shadow(0 2px 8px rgba(26, 26, 26, 0.2));
-    animation: ${shimmerGlow} 3s ease-in-out infinite;
-    background: linear-gradient(
-      45deg,
-      ${theme.colors.primary} 0%,
-      ${theme.colors.secondary} 50%,
-      ${theme.colors.primary} 100%
-    );
-    background-size: 200% 200%;
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: ${props => props.theme.colors.primary};
   }
   
   .text {
-    background: linear-gradient(
-      45deg,
-      ${theme.colors.primary} 0%,
-      ${theme.colors.secondary} 50%,
-      ${theme.colors.primary} 100%
-    );
-    background-size: 200% 200%;
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: ${shimmerGlow} 3s ease-in-out infinite;
+    @media (max-width: ${props => props.theme.breakpoints.sm}) {
+      display: none;
+    }
   }
 `;
 
-const NavActions = styled.div`
+const NavItems = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.md};
+  gap: ${props => props.theme.spacing.lg};
   
-  @media (max-width: ${theme.breakpoints.md}) {
-    gap: ${theme.spacing.sm};
+  @media (max-width: ${props => props.theme.breakpoints.md}) {
+    display: none;
   }
 `;
 
-const UserActions = styled.div`
+const QuotaDisplay = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.md};
-  flex-shrink: 0;
+  gap: ${props => props.theme.spacing.md};
+  background: ${props => props.theme.colors.gray[50]};
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
+  border-radius: ${props => props.theme.borderRadius.full};
+  border: 1px solid ${props => props.theme.colors.gray[200]};
+  min-width: 200px;
 `;
 
-// Quota-related styled components removed - moved to SidePanel in App.jsx
+const QuotaInfo = styled.div`
+  flex: 1;
+  
+  .usage {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: ${props => props.theme.colors.dark};
+    margin-bottom: 2px;
+  }
+  
+  .percentage {
+    font-size: 0.75rem;
+    color: ${props => props.theme.colors.gray[500]};
+  }
+`;
 
-const ActionButton = styled.button`
+const QuotaBar = styled.div`
+  width: 60px;
+  height: 6px;
+  background: ${props => props.theme.colors.gray[200]};
+  border-radius: ${props => props.theme.borderRadius.full};
+  overflow: hidden;
+`;
+
+const QuotaFill = styled.div`
+  height: 100%;
+  background: linear-gradient(90deg, ${props => props.theme.colors.success}, ${props => props.theme.colors.primary});
+  width: ${props => props.percentage}%;
+  transition: width 0.3s ease;
+`;
+
+const UserInfo = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.sm};
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
-  background: rgba(26, 26, 26, 0.05);
-  border: 1px solid rgba(26, 26, 26, 0.1);
-  border-radius: ${theme.borderRadius.lg};
-  color: ${theme.colors.gray[700]};
+  gap: ${props => props.theme.spacing.sm};
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: 0.875rem;
+  
+  .avatar {
+    width: 32px;
+    height: 32px;
+    background: ${props => props.theme.colors.primary};
+    color: ${props => props.theme.colors.light};
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    border: 2px solid ${props => props.theme.colors.border};
+    box-shadow: ${props => props.theme.shadows.sm};
+  }
+  
+  span {
+    color: ${props => props.theme.colors.text};
+    font-weight: 500;
+  }
+`;
+
+const LogoutButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  background: ${props => props.theme.colors.danger};
+  color: white;
+  border: none;
+  border-radius: ${props => props.theme.borderRadius.md};
   font-weight: 500;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
+  transition: all 0.2s ease;
   
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.2),
-      transparent
-    );
-    transition: left 0.5s ease;
+  &:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
+const ThemeToggle = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: ${props => props.theme.borderRadius.full};
+  background: ${props => props.theme.colors.gray[100]};
+  border: 1px solid ${props => props.theme.colors.border};
+  color: ${props => props.theme.colors.text};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  /* Mobile layout adjustments */
+  @media (max-width: ${props => props.theme.breakpoints.md}) {
+    width: auto;
+    height: auto;
+    border-radius: ${props => props.theme.borderRadius.md};
+    padding: ${props => props.theme.spacing.md};
+    justify-content: flex-start;
+    gap: ${props => props.theme.spacing.sm};
   }
   
   &:hover {
-    background: rgba(26, 26, 26, 0.08);
-    color: ${theme.colors.primary};
+    background: ${props => props.theme.colors.gray[200]};
     transform: translateY(-1px);
-    box-shadow: ${theme.shadows.md};
-    border-color: ${theme.colors.primary}30;
-    
-    &::before {
-      left: 100%;
-    }
+    box-shadow: ${props => props.theme.shadows.md};
   }
   
   &:active {
     transform: translateY(0);
   }
   
-  &.primary {
-    background: linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.secondary} 100%);
-    color: white;
-    border-color: transparent;
+  svg {
+    font-size: 18px;
+  }
+  
+  span {
+    color: ${props => props.theme.colors.text};
+    font-weight: 500;
     
-    &:hover {
-      background: linear-gradient(135deg, ${theme.colors.secondary} 0%, ${theme.colors.dark} 100%);
-      color: white;
-      transform: translateY(-2px);
-      box-shadow: ${theme.shadows.lg};
-    }
-  }
-  
-  &.danger {
-    &:hover {
-      background: rgba(239, 68, 68, 0.1);
-      color: ${theme.colors.danger};
-      border-color: ${theme.colors.danger}30;
-    }
-  }
-  
-  @media (max-width: ${theme.breakpoints.sm}) {
-    .text {
+    @media (min-width: ${props => props.theme.breakpoints.md}) {
       display: none;
     }
   }
 `;
 
-const MobileMenu = styled(motion.div)`
-  display: none;
-  
-  @media (max-width: ${theme.breakpoints.md}) {
-    display: block;
-  }
-`;
-
 const MobileMenuButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: rgba(26, 26, 26, 0.05);
-  border: 1px solid rgba(26, 26, 26, 0.1);
-  border-radius: ${theme.borderRadius.lg};
-  color: ${theme.colors.primary};
+  display: none;
+  background: none;
+  border: none;
+  color: ${props => props.theme.colors.primary};
+  font-size: 1.5rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  padding: ${props => props.theme.spacing.sm};
   
-  &:hover {
-    background: rgba(26, 26, 26, 0.08);
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.sm};
+  @media (max-width: ${props => props.theme.breakpoints.md}) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 `;
 
-export const Navbar = () => {
+const MobileMenu = styled.div`
+  position: fixed;
+  top: 80px;
+  left: 0;
+  right: 0;
+  background: ${props => props.theme.colors.surface};
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+  padding: ${props => props.theme.spacing.lg};
+  transform: translateY(${props => props.isOpen ? '0' : '-100%'});
+  opacity: ${props => props.isOpen ? '1' : '0'};
+  visibility: ${props => props.isOpen ? 'visible' : 'hidden'};
+  transition: all 0.3s ease;
+  z-index: 999;
+  backdrop-filter: blur(20px);
+  box-shadow: ${props => props.theme.shadows.lg};
+  
+  @media (min-width: ${props => props.theme.breakpoints.md}) {
+    display: none;
+  }
+`;
+
+const MobileMenuItem = styled.div`
+  padding: ${props => props.theme.spacing.lg} 0;
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+  
+  &:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  
+  &:first-child {
+    padding-top: 0;
+  }
+  
+  /* Ensure all child elements have proper theming */
+  * {
+    color: ${props => props.theme.colors.text};
+  }
+`;
+
+const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, getQuotaInfo } = useAuth();
+  const { isDarkTheme, toggleTheme } = useTheme();
+  
+  const handleLogout = useCallback(() => {
+    logout();
+    setMobileMenuOpen(false);
+  }, [logout]);
+  
+  const quotaInfo = getQuotaInfo();
   
   return (
-    <NavbarContainer
-      initial={{ y: -100, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-    >
-      <NavbarContent>
+    <NavbarContainer>
+      <NavContent>
         {/* Brand */}
-        <Brand>
+        <Logo>
           <FiShield className="icon" />
           <span className="text">SecureVault</span>
-        </Brand>
+        </Logo>
         
         {/* Desktop Navigation */}
-        <NavActions>
-          {/* User Actions - Right Side */}
-          <UserActions>
-            <ActionButton>
-              <FiUser size={16} />
-              <span className="text">Profile</span>
-            </ActionButton>
-            
-            <ActionButton className="danger" onClick={logout}>
-              <FiLogOut size={16} />
-              <span className="text">Logout</span>
-            </ActionButton>
-            
-            {/* Mobile Menu */}
-            <MobileMenu>
-              <MobileMenuButton onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                {mobileMenuOpen ? <FiX size={20} /> : <FiMenu size={20} />}
-              </MobileMenuButton>
-            </MobileMenu>
-          </UserActions>
-        </NavActions>
-      </NavbarContent>
+        <NavItems>
+          <QuotaDisplay>
+            <FiHardDrive style={{ color: 'currentColor', fontSize: '1.25rem' }} />
+            <QuotaInfo>
+              <div className="usage">{quotaInfo.usagePercentage.toFixed(1)}% Used</div>
+              <div className="percentage">{formatFileSize(quotaInfo.totalSize)} / {formatFileSize(quotaInfo.quota)}</div>
+            </QuotaInfo>
+            <QuotaBar>
+              <QuotaFill percentage={quotaInfo.usagePercentage} />
+            </QuotaBar>
+          </QuotaDisplay>
+          
+          <UserInfo>
+            <div className="avatar">
+              {user?.username?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <span>{user?.username || 'User'}</span>
+          </UserInfo>
+          
+          <ThemeToggle onClick={toggleTheme} title={isDarkTheme ? 'Switch to light mode' : 'Switch to dark mode'}>
+            {isDarkTheme ? <FiSun /> : <FiMoon />}
+            <span>
+              {isDarkTheme ? 'Light Mode' : 'Dark Mode'}
+            </span>
+          </ThemeToggle>
+          
+          <LogoutButton onClick={handleLogout}>
+            <FiLogOut />
+            Logout
+          </LogoutButton>
+        </NavItems>
+
+        {/* Mobile Menu Button */}
+        <MobileMenuButton onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          {mobileMenuOpen ? <FiX /> : <FiMenu />}
+        </MobileMenuButton>
+      </NavContent>
+
+      {/* Mobile Menu */}
+      <MobileMenu isOpen={mobileMenuOpen}>
+                 <MobileMenuItem>
+          <QuotaDisplay style={{ minWidth: 'auto', width: '100%' }}>
+            <FiHardDrive style={{ color: 'currentColor', fontSize: '1.25rem' }} />
+            <QuotaInfo>
+              <div className="usage" style={{ color: 'inherit' }}>{quotaInfo.usagePercentage.toFixed(1)}% Used</div>
+              <div className="percentage" style={{ color: 'inherit' }}>{formatFileSize(quotaInfo.totalSize)} / {formatFileSize(quotaInfo.quota)}</div>
+            </QuotaInfo>
+            <QuotaBar>
+              <QuotaFill percentage={quotaInfo.usagePercentage} />
+            </QuotaBar>
+          </QuotaDisplay>
+        </MobileMenuItem>
+        
+        <MobileMenuItem>
+          <UserInfo style={{ justifyContent: 'flex-start' }}>
+            <div className="avatar">
+              {user?.username?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <span style={{ color: 'inherit' }}>{user?.username || 'User'}</span>
+          </UserInfo>
+        </MobileMenuItem>
+        
+        <MobileMenuItem>
+          <ThemeToggle onClick={toggleTheme} title={isDarkTheme ? 'Switch to light mode' : 'Switch to dark mode'}>
+            {isDarkTheme ? <FiSun /> : <FiMoon />}
+            <span>
+              {isDarkTheme ? 'Light Mode' : 'Dark Mode'}
+            </span>
+          </ThemeToggle>
+        </MobileMenuItem>
+        
+        <MobileMenuItem>
+          <LogoutButton onClick={handleLogout} style={{ width: '100%', justifyContent: 'center' }}>
+            <FiLogOut />
+            Logout
+          </LogoutButton>
+        </MobileMenuItem>
+      </MobileMenu>
     </NavbarContainer>
   );
-}; 
+};
+
+Navbar.displayName = 'Navbar';
+
+// Helper function for file size formatting
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
+export { Navbar }; 

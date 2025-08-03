@@ -2,14 +2,24 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import { AuthProvider } from './contexts/AuthContext.jsx';
-import { ThemeProvider } from 'styled-components';
-import { theme } from './styles/GlobalStyles.js';
+import { ThemeProvider as StyledThemeProvider } from 'styled-components';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext.jsx';
+
+const ThemedApp = () => {
+  const { theme } = useTheme();
+  
+  return (
+    <StyledThemeProvider theme={theme}>
+      <App />
+    </StyledThemeProvider>
+  );
+};
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ThemeProvider theme={theme}>
+    <ThemeProvider>
       <AuthProvider>
-        <App />
+        <ThemedApp />
       </AuthProvider>
     </ThemeProvider>
   </React.StrictMode>,

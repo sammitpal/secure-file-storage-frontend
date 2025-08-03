@@ -1,34 +1,131 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import styled from 'styled-components';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FiFolder, FiFile, FiDownload, FiTrash2, FiMoreVertical, FiEye } from 'react-icons/fi';
+import { 
+  FiFolder, 
+  FiFile, 
+  FiDownload, 
+  FiTrash2, 
+  FiMoreVertical, 
+  FiEye,
+  FiImage,
+  FiFileText,
+  FiMusic,
+  FiVideo,
+  FiArchive,
+  FiCode,
+  FiDatabase
+} from 'react-icons/fi';
 import { format } from 'date-fns';
 import { fileApi, formatFileSize, getFileIcon, downloadFile } from '../services/api.js';
-import { folderApi } from '../services/api.js'; // Added folderApi import
-import { theme, Button } from '../styles/GlobalStyles.js';
+import { folderApi } from '../services/api.js';
+import { Button } from '../styles/GlobalStyles.js';
 import { toast } from 'react-toastify';
 
+// File type detection and icon mapping
+const getFileTypeInfo = (fileName) => {
+  const extension = fileName.toLowerCase().split('.').pop();
+  
+  // Image files
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(extension)) {
+    return {
+      icon: FiImage,
+      color: '#10b981', // Green
+      background: '#10b98120',
+      category: 'image'
+    };
+  }
+  
+  // Document files
+  if (['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'].includes(extension)) {
+    return {
+      icon: FiFileText,
+      color: '#3b82f6', // Blue
+      background: '#3b82f620',
+      category: 'document'
+    };
+  }
+  
+  // Spreadsheet files
+  if (['csv', 'xls', 'xlsx', 'ods'].includes(extension)) {
+    return {
+      icon: FiDatabase,
+      color: '#059669', // Dark green
+      background: '#05966920',
+      category: 'spreadsheet'
+    };
+  }
+  
+  // Audio files
+  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'].includes(extension)) {
+    return {
+      icon: FiMusic,
+      color: '#8b5cf6', // Purple
+      background: '#8b5cf620',
+      category: 'audio'
+    };
+  }
+  
+  // Video files
+  if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm'].includes(extension)) {
+    return {
+      icon: FiVideo,
+      color: '#ef4444', // Red
+      background: '#ef444420',
+      category: 'video'
+    };
+  }
+  
+  // Archive files
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(extension)) {
+    return {
+      icon: FiArchive,
+      color: '#f59e0b', // Amber
+      background: '#f59e0b20',
+      category: 'archive'
+    };
+  }
+  
+  // Code files
+  if (['js', 'jsx', 'ts', 'tsx', 'html', 'css', 'scss', 'py', 'java', 'cpp', 'c', 'php', 'rb', 'go', 'rs'].includes(extension)) {
+    return {
+      icon: FiCode,
+      color: '#6366f1', // Indigo
+      background: '#6366f120',
+      category: 'code'
+    };
+  }
+  
+  // Default file icon
+  return {
+    icon: FiFile,
+    color: '#6b7280', // Gray
+    background: '#6b728020',
+    category: 'other'
+  };
+};
+
 const ListContainer = styled.div`
-  background: white;
-  border-radius: ${theme.borderRadius.lg};
-  box-shadow: ${theme.shadows.md};
+  background: ${props => props.theme.colors.surface};
+  border-radius: ${props => props.theme.borderRadius.lg};
+  box-shadow: ${props => props.theme.shadows.md};
+  border: 1px solid ${props => props.theme.colors.border};
   overflow: hidden;
 `;
 
 const ListHeader = styled.div`
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.md} ${theme.spacing.lg};
-  background: ${theme.colors.gray[50]};
-  border-bottom: 1px solid ${theme.colors.gray[200]};
+  grid-template-columns: 1fr 100px 120px 100px;
+  gap: ${props => props.theme.spacing.md};
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  background: ${props => props.theme.colors.gray[100]};
+  border-bottom: 1px solid ${props => props.theme.colors.border};
   font-weight: 600;
   font-size: 0.875rem;
-  color: ${theme.colors.gray[600]};
+  color: ${props => props.theme.colors.textSecondary};
   text-transform: uppercase;
   letter-spacing: 0.05em;
 
-  @media (max-width: ${theme.breakpoints.md}) {
+  @media (max-width: ${props => props.theme.breakpoints.md}) {
     grid-template-columns: 1fr auto;
     .desktop-only {
       display: none;
@@ -36,25 +133,25 @@ const ListHeader = styled.div`
   }
 `;
 
-const ListItem = styled(motion.div)`
+const ListItem = styled.div`
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.md} ${theme.spacing.lg};
-  border-bottom: 1px solid ${theme.colors.gray[100]};
-  transition: all 0.2s ease;
+  grid-template-columns: 1fr 100px 120px 100px;
+  gap: ${props => props.theme.spacing.md};
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+  transition: background-color 0.2s ease;
   cursor: ${props => props.isFolder ? 'pointer' : 'default'};
   position: relative;
 
   &:hover {
-    background: ${theme.colors.gray[50]};
+    background: ${props => props.theme.colors.gray[100]};
   }
 
   &:last-child {
     border-bottom: none;
   }
 
-  @media (max-width: ${theme.breakpoints.md}) {
+  @media (max-width: ${props => props.theme.breakpoints.md}) {
     grid-template-columns: 1fr auto;
     .desktop-only {
       display: none;
@@ -65,83 +162,99 @@ const ListItem = styled(motion.div)`
 const ItemInfo = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.md};
-  min-width: 0; // Allow text truncation
+  gap: ${props => props.theme.spacing.md};
+  min-width: 0;
 `;
 
 const ItemIcon = styled.div`
-  font-size: 1.5rem;
-  color: ${props => props.isFolder ? theme.colors.warning : theme.colors.primary};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: ${props => props.theme.borderRadius.md};
+  background: ${props => props.iconBackground || (props.isFolder ? props.theme.colors.warning + '20' : props.theme.colors.primary + '20')};
+  color: ${props => props.iconColor || (props.isFolder ? props.theme.colors.warning : props.theme.colors.primary)};
+  font-size: 1.25rem;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
+  
+  &:hover {
+    transform: scale(1.05);
+  }
 `;
 
-const ItemDetails = styled.div`
-  min-width: 0; // Allow text truncation
+const ItemName = styled.div`
+  min-width: 0;
   
-  .item-name {
-    font-weight: 500;
-    color: ${theme.colors.gray[800]};
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .name {
+    font-weight: 600;
+    color: ${props => props.theme.colors.text};
+    font-size: 0.875rem;
     margin-bottom: 2px;
+    word-break: break-word;
   }
   
-  .item-meta {
+  .date {
     font-size: 0.75rem;
-    color: ${theme.colors.gray[500]};
-    display: flex;
-    gap: ${theme.spacing.sm};
-    flex-wrap: wrap;
+    color: ${props => props.theme.colors.textSecondary};
   }
 `;
 
 const ItemSize = styled.div`
-  font-size: 0.875rem;
-  color: ${theme.colors.gray[600]};
-  font-weight: 500;
-`;
-
-const ItemDate = styled.div`
-  font-size: 0.875rem;
-  color: ${theme.colors.gray[500]};
-`;
-
-const ActionsContainer = styled.div`
   display: flex;
-  gap: ${theme.spacing.xs};
   align-items: center;
+  font-size: 0.875rem;
+  color: ${props => props.theme.colors.textSecondary};
+  text-align: right;
 `;
 
-const ActionButton = styled.button`
-  background: ${props => 
-    props.variant === 'danger' ? theme.colors.danger + '10' :
-    props.variant === 'primary' ? theme.colors.primary + '10' :
-    theme.colors.gray[100]
-  };
-  color: ${props => 
-    props.variant === 'danger' ? theme.colors.danger :
-    props.variant === 'primary' ? theme.colors.primary :
-    theme.colors.gray[600]
-  };
-  border: none;
-  padding: ${theme.spacing.xs};
-  border-radius: ${theme.borderRadius.sm};
-  cursor: pointer;
-  transition: all 0.2s ease;
+const ItemModified = styled.div`
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  color: ${props => props.theme.colors.textSecondary};
+  text-align: right;
+`;
+
+const ItemActions = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: ${props => props.theme.spacing.xs};
+  opacity: 1;
+  transition: opacity 0.2s ease;
+  
+  @media (max-width: ${props => props.theme.breakpoints.md}) {
+    opacity: 1;
+  }
+`;
 
+const ActionButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: ${props => props.theme.borderRadius.sm};
+  background: ${props => props.theme.colors.gray[200]};
+  color: ${props => props.theme.colors.text};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
   &:hover {
-    background: ${props => 
-      props.variant === 'danger' ? theme.colors.danger + '20' :
-      props.variant === 'primary' ? theme.colors.primary + '20' :
-      theme.colors.gray[200]
-    };
+    background: ${props => props.theme.colors.primary};
+    color: white;
     transform: scale(1.05);
   }
-
+  
+  &.danger:hover {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    transform: scale(1.05);
+  }
+  
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -149,198 +262,125 @@ const ActionButton = styled.button`
   }
 `;
 
-const DropdownMenu = styled.div`
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: white;
-  border: 1px solid ${theme.colors.gray[200]};
-  border-radius: ${theme.borderRadius.md};
-  box-shadow: ${theme.shadows.lg};
-  z-index: 10;
-  min-width: 150px;
-  opacity: ${props => props.show ? 1 : 0};
-  visibility: ${props => props.show ? 'visible' : 'hidden'};
-  transform: ${props => props.show ? 'translateY(0)' : 'translateY(-10px)'};
-  transition: all 0.2s ease;
+const EmptyState = styled.div`
+  text-align: center;
+  padding: ${props => props.theme.spacing.xxl};
+  color: ${props => props.theme.colors.textSecondary};
+  
+  .icon {
+    font-size: 4rem;
+    color: ${props => props.theme.colors.gray[300]};
+    margin-bottom: ${props => props.theme.spacing.lg};
+  }
+  
+  .title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: ${props => props.theme.colors.text};
+    margin-bottom: ${props => props.theme.spacing.sm};
+  }
+  
+  .description {
+    font-size: 0.875rem;
+    max-width: 400px;
+    margin: 0 auto;
+  }
 `;
 
-const DropdownItem = styled.button`
-  width: 100%;
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
-  border: none;
-  background: none;
-  text-align: left;
-  cursor: pointer;
+const LoadingContainer = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.sm};
-  font-size: 0.875rem;
-  color: ${props => props.variant === 'danger' ? theme.colors.danger : theme.colors.gray[700]};
-  transition: all 0.2s ease;
+  justify-content: center;
+  padding: ${props => props.theme.spacing.xxl};
+  color: ${props => props.theme.colors.textSecondary};
+`;
 
-  &:hover:not(:disabled) {
-    background: ${props => props.variant === 'danger' ? theme.colors.danger + '10' : theme.colors.gray[50]};
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  &:first-child {
-    border-radius: ${theme.borderRadius.md} ${theme.borderRadius.md} 0 0;
-  }
-
-  &:last-child {
-    border-radius: 0 0 ${theme.borderRadius.md} ${theme.borderRadius.md};
+const LoadingSpinner = styled.div`
+  width: 32px;
+  height: 32px;
+  border: 3px solid ${props => props.theme.colors.gray[200]};
+  border-top: 3px solid ${props => props.theme.colors.primary};
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: ${props => props.theme.spacing.md};
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 `;
 
-const EmptyState = styled.div`
-  padding: ${theme.spacing['2xl']};
-  text-align: center;
-  color: ${theme.colors.gray[500]};
-
-  .icon {
-    font-size: 3rem;
-    margin-bottom: ${theme.spacing.lg};
-    opacity: 0.5;
-  }
-
-  h3 {
-    font-size: 1.125rem;
-    margin-bottom: ${theme.spacing.sm};
-    color: ${theme.colors.gray[700]};
-  }
-
-  p {
-    font-size: 0.875rem;
-  }
-`;
-
-export const FileList = ({
-  files,
-  loading,
-  currentPath,
-  onFolderClick,
-  onFileDeleted
-}) => {
+const FileList = React.memo(({ files, loading, currentPath, onFolderClick, onFileDeleted }) => {
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [deletingItems, setDeletingItems] = useState(new Set());
-  const [downloadingItems, setDownloadingItems] = useState(new Set());
 
-  const handleDownload = async (item) => {
-    setDownloadingItems(prev => new Set(prev).add(item.path));
-    
+  const handleFolderClick = useCallback((item) => {
+    if (item.type === 'folder') {
+      const newPath = currentPath ? `${currentPath}/${item.name}` : item.name;
+      onFolderClick(newPath);
+    }
+  }, [currentPath, onFolderClick]);
+
+  const handleDownload = useCallback(async (item, e) => {
+    e.stopPropagation();
     try {
-      console.log('Starting download for:', item.name, 'at path:', item.path);
-      
-      const response = await fileApi.getDownloadUrl(item.path);
-      console.log('Download URL response:', response);
-      
-      if (response.success && response.data) {
-        console.log('Generated download URL:', response.data.downloadUrl);
-        
-        // Use the simplified downloadFile function
-        try {
-          await downloadFile(response.data.downloadUrl, item.name);
-          console.log('Download function completed successfully');
-          toast.success('Download started');
-        } catch (downloadError) {
-          // This should rarely happen now with simplified function
-          console.warn('Download failed:', downloadError);
-          toast.error('Download failed');
-        }
-      } else {
-        throw new Error(response.message || 'Failed to get download URL');
-      }
+      await downloadFile(item.path, item.name);
+      toast.success(`Download started: ${item.name}`);
     } catch (error) {
       console.error('Download error:', error);
-      toast.error(`Failed to prepare download: ${error.message}`);
-    } finally {
-      setDownloadingItems(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(item.path);
-        return newSet;
-      });
+      toast.error(error.message || 'Failed to download file');
     }
-  };
+  }, []);
 
-  const handleDelete = async (item) => {
-    if (!window.confirm(`Are you sure you want to delete "${item.name}"?`)) {
+  const handleDelete = useCallback(async (item, e) => {
+    e.stopPropagation();
+    
+    if (!window.confirm(`Are you sure you want to permanently delete "${item.name}"?`)) {
       return;
     }
 
-    setDeletingItems(prev => new Set(prev).add(item.path));
-    
+    const itemId = item.path;
+    setDeletingItems(prev => new Set([...prev, itemId]));
+
     try {
-      let response;
-      
-      // Use different API endpoints for files vs folders
-      if (item.type === 'folder') {
-        console.log('Deleting folder:', item.path);
-        response = await folderApi.delete(item.path);
+      if (item.type === 'file') {
+        await fileApi.delete(item.path);
       } else {
-        console.log('Deleting file:', item.path);
-        response = await fileApi.delete(item.path);
+        await folderApi.delete(item.path);
       }
       
-      if (response.success) {
-        toast.success(`${item.name} deleted successfully`);
-        onFileDeleted(); // Call the new prop
-      } else {
-        throw new Error(response.message);
-      }
+      toast.success(`${item.name} deleted successfully`);
+      onFileDeleted();
     } catch (error) {
       console.error('Delete error:', error);
-      toast.error(`Failed to delete ${item.name}: ${error.message}`);
+      toast.error(`Failed to delete ${item.name}`);
     } finally {
       setDeletingItems(prev => {
         const newSet = new Set(prev);
-        newSet.delete(item.path);
+        newSet.delete(itemId);
         return newSet;
       });
     }
-  };
-
-  const handleFolderClick = (item) => {
-    if (item.type === 'folder') {
-      onFolderClick(item.path);
-    }
-  };
-
-  const formatLastModified = (dateString) => {
-    if (!dateString) return '';
-    try {
-      return format(new Date(dateString), 'MMM dd, yyyy');
-    } catch {
-      return '';
-    }
-  };
-
-  const isDeleting = (path) => deletingItems.has(path);
-  const isDownloading = (path) => downloadingItems.has(path);
+  }, [onFileDeleted]);
 
   if (loading) {
     return (
       <ListContainer>
-        <EmptyState>
-          <div className="icon">⏳</div>
-          <h3>Loading...</h3>
-          <p>Fetching your files and folders</p>
-        </EmptyState>
+        <LoadingContainer>
+          <LoadingSpinner></LoadingSpinner>
+          Loading...
+        </LoadingContainer>
       </ListContainer>
     );
   }
 
-  if (files.length === 0) {
+  if (!files || files.length === 0) {
     return (
       <ListContainer>
         <EmptyState>
           <div className="icon">📁</div>
-          <h3>No files yet</h3>
-          <p>Upload some files to get started</p>
+          <h3>No files or folders</h3>
+          <p>This folder is empty. Upload some files or create a new folder to get started.</p>
         </EmptyState>
       </ListContainer>
     );
@@ -349,125 +389,77 @@ export const FileList = ({
   return (
     <ListContainer>
       <ListHeader>
-        <div>Name</div>
-        <div className="desktop-only">Size</div>
-        <div className="desktop-only">Modified</div>
-        <div>Actions</div>
+        <span>Name</span>
+        <span className="desktop-only">Size</span>
+        <span className="desktop-only">Modified</span>
+        <span>Actions</span>
       </ListHeader>
 
-      <AnimatePresence>
-        {files.map((item, index) => (
+      {files.map((item) => {
+        // Only get file type info for files, not folders
+        const fileTypeInfo = item.type === 'file' ? getFileTypeInfo(item.name) : null;
+        const Icon = fileTypeInfo?.icon || FiFile;
+        const color = fileTypeInfo?.color;
+        const background = fileTypeInfo?.background;
+        
+        return (
           <ListItem
             key={item.path}
             isFolder={item.type === 'folder'}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3, delay: index * 0.05 }}
             onClick={() => handleFolderClick(item)}
           >
             <ItemInfo>
-              <ItemIcon isFolder={item.type === 'folder'}>
-                {item.type === 'folder' ? <FiFolder /> : getFileIcon(item.name)}
+              <ItemIcon 
+                isFolder={item.type === 'folder'} 
+                iconBackground={background} 
+                iconColor={color}
+              >
+                {item.type === 'folder' ? <FiFolder /> : <Icon />}
               </ItemIcon>
-              <ItemDetails>
-                <div className="item-name" title={item.name}>
-                  {item.name}
-                </div>
-                <div className="item-meta">
-                  <span>{item.type === 'folder' ? 'Folder' : 'File'}</span>
-                  {item.size && (
-                    <span className="desktop-hidden">
-                      {formatFileSize(item.size)}
-                    </span>
-                  )}
-                  {item.lastModified && (
-                    <span className="desktop-hidden">
-                      {formatLastModified(item.lastModified)}
-                    </span>
-                  )}
-                </div>
-              </ItemDetails>
+              <ItemName>
+                <div className="name">{item.name}</div>
+                <div className="date">{format(new Date(item.lastModified), 'MMM d, yyyy')}</div>
+              </ItemName>
             </ItemInfo>
 
             <ItemSize className="desktop-only">
-              {item.size ? formatFileSize(item.size) : item.type === 'folder' ? '—' : ''}
+              {item.type === 'file' ? formatFileSize(item.size) : '—'}
             </ItemSize>
 
-            <ItemDate className="desktop-only">
-              {formatLastModified(item.lastModified)}
-            </ItemDate>
+            <ItemModified className="desktop-only">
+              {format(new Date(item.lastModified), 'MMM d, yyyy')}
+            </ItemModified>
 
-            <ActionsContainer onClick={e => e.stopPropagation()}>
+            <ItemActions onClick={e => e.stopPropagation()}>
               {item.type === 'file' && (
                 <ActionButton
-                  variant="primary"
-                  onClick={() => handleDownload(item)}
+                  onClick={(e) => handleDownload(item, e)}
                   title="Download"
-                  disabled={isDeleting(item.path) || isDownloading(item.path)}
                 >
-                  {isDownloading(item.path) ? '⏳' : <FiDownload size={16} />}
+                  <FiDownload size={14} />
                 </ActionButton>
               )}
               
               <ActionButton
-                variant="danger"
-                onClick={() => handleDelete(item)}
+                className="danger"
+                onClick={(e) => handleDelete(item, e)}
+                disabled={deletingItems.has(item.path)}
                 title="Delete"
-                disabled={isDeleting(item.path)}
               >
-                {isDeleting(item.path) ? '⏳' : <FiTrash2 size={16} />}
+                {deletingItems.has(item.path) ? (
+                  <LoadingSpinner style={{ width: '14px', height: '14px', border: '2px solid currentColor', borderTopColor: 'transparent' }}></LoadingSpinner>
+                ) : (
+                  <FiTrash2 size={14} />
+                )}
               </ActionButton>
-
-              <div style={{ position: 'relative' }}>
-                <ActionButton
-                  onClick={() => setActiveDropdown(
-                    activeDropdown === item.path ? null : item.path
-                  )}
-                  title="More actions"
-                >
-                  <FiMoreVertical size={16} />
-                </ActionButton>
-
-                <DropdownMenu show={activeDropdown === item.path}>
-                  {item.type === 'file' && (
-                    <DropdownItem 
-                      onClick={() => handleDownload(item)}
-                      disabled={isDownloading(item.path)}
-                    >
-                      {isDownloading(item.path) ? '⏳' : <FiDownload size={14} />}
-                      {isDownloading(item.path) ? 'Downloading...' : 'Download'}
-                    </DropdownItem>
-                  )}
-                  <DropdownItem onClick={() => console.log('View info', item)}>
-                    <FiEye size={14} />
-                    View Info
-                  </DropdownItem>
-                  <DropdownItem variant="danger" onClick={() => handleDelete(item)}>
-                    <FiTrash2 size={14} />
-                    Delete
-                  </DropdownItem>
-                </DropdownMenu>
-              </div>
-            </ActionsContainer>
+            </ItemActions>
           </ListItem>
-        ))}
-      </AnimatePresence>
-
-      {/* Click outside to close dropdown */}
-      {activeDropdown && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 5
-          }}
-          onClick={() => setActiveDropdown(null)}
-        />
-      )}
+        );
+      })}
     </ListContainer>
   );
-}; 
+});
+
+FileList.displayName = 'FileList';
+
+export { FileList }; 

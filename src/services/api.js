@@ -287,11 +287,25 @@ export const folderApi = {
 };
 
 // Utility functions
-export const downloadFile = (url, filename) => {
+export const downloadFile = async (filePath, filename) => {
   try {
-    // For S3 presigned URLs, direct link method works best
+    // Get download URL from backend
+    const response = await fileApi.getDownloadUrl(filePath);
+    
+    if (!response.success || !response.data?.downloadUrl) {
+      throw new Error(response.message || 'Failed to get download URL');
+    }
+
+    const { downloadUrl } = response.data;
+    
+    // Handle different types of download URLs
+    if (downloadUrl.startsWith('mock://')) {
+      throw new Error('File storage service is not properly configured. Please contact administrator.');
+    }
+    
+    // For S3 presigned URLs or any valid HTTP(S) URL
     const link = document.createElement('a');
-    link.href = url;
+    link.href = downloadUrl;
     link.download = filename || 'download';
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
@@ -301,20 +315,27 @@ export const downloadFile = (url, filename) => {
     link.click();
     document.body.removeChild(link);
 
-    // Return success - no need to await anything
     return Promise.resolve();
 
   } catch (error) {
-    console.error('Direct download failed:', error);
-
-    // Fallback: Just open the URL in new tab
-    try {
-      window.open(url, '_blank', 'noopener,noreferrer');
-      return Promise.resolve(); // Still consider it success
-    } catch (fallbackError) {
-      console.error('Fallback also failed:', fallbackError);
-      return Promise.reject(new Error('Download failed completely'));
+    console.error('Download failed:', error);
+    
+    // Handle specific error types
+    let errorMessage = error.message || 'Download failed';
+    
+    if (error.response?.status === 503) {
+      errorMessage = 'File download service is currently unavailable. Please contact administrator.';
+    } else if (errorMessage.includes('S3 storage is not configured')) {
+      errorMessage = 'File storage is not properly configured. Please contact administrator.';
+    } else if (errorMessage.includes('File not found in storage')) {
+      errorMessage = 'File not found in storage. It may have been deleted or moved.';
+    } else if (errorMessage.includes('Access denied to file storage')) {
+      errorMessage = 'Storage access error. Please contact administrator.';
+    } else if (errorMessage.includes('Storage service error')) {
+      errorMessage = 'Storage service error. Please try again or contact administrator.';
     }
+    
+    throw new Error(errorMessage);
   }
 };
 

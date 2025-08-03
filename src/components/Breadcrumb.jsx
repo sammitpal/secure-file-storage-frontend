@@ -1,49 +1,27 @@
 import React from 'react';
 import styled from 'styled-components';
 import { FiHome, FiChevronRight } from 'react-icons/fi';
-import { theme } from '../styles/GlobalStyles.js';
 
 const BreadcrumbContainer = styled.nav`
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  padding: ${theme.spacing.lg} ${theme.spacing.xl};
-  border-radius: ${theme.borderRadius.xl};
-  box-shadow: ${theme.shadows.md};
-  margin-bottom: ${theme.spacing.xl};
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: ${props => props.theme.colors.surface};
+  padding: ${props => props.theme.spacing.lg} ${props => props.theme.spacing.xl};
+  border-radius: ${props => props.theme.borderRadius.xl};
+  box-shadow: ${props => props.theme.shadows.md};
+  border: 1px solid ${props => props.theme.colors.border};
   position: relative;
   overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.3),
-      transparent
-    );
-    transition: left 0.8s ease;
-  }
-  
-  &:hover::before {
-    left: 100%;
-  }
+  transition: all 0.2s ease;
   
   &:hover {
     transform: translateY(-1px);
-    box-shadow: ${theme.shadows.lg};
+    box-shadow: ${props => props.theme.shadows.lg};
   }
 `;
 
 const BreadcrumbList = styled.ol`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.sm};
+  gap: ${props => props.theme.spacing.sm};
   list-style: none;
   flex-wrap: wrap;
 `;
@@ -51,80 +29,54 @@ const BreadcrumbList = styled.ol`
 const BreadcrumbItem = styled.li`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.sm};
-  font-size: 1rem;
-  font-weight: 500;
-  
-  &:not(:last-child) {
-    color: ${theme.colors.gray[600]};
-  }
+  gap: ${props => props.theme.spacing.sm};
+  font-size: 0.875rem;
+  color: ${props => props.theme.colors.textSecondary};
   
   &:last-child {
-    color: ${theme.colors.primary};
+    color: ${props => props.theme.colors.text};
     font-weight: 600;
   }
 `;
 
 const BreadcrumbLink = styled.button`
-  background: rgba(26, 26, 26, 0.05);
-  border: 1px solid rgba(26, 26, 26, 0.1);
-  color: inherit;
+  background: none;
+  border: none;
+  color: ${props => props.theme.colors.primary};
   cursor: pointer;
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
-  border-radius: ${theme.borderRadius.lg};
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: inherit;
+  font-family: inherit;
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  border-radius: ${props => props.theme.borderRadius.sm};
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.sm};
-  font-weight: inherit;
-  min-height: 36px;
+  gap: ${props => props.theme.spacing.xs};
+  transition: all 0.2s ease;
   
   &:hover {
-    background: rgba(26, 26, 26, 0.08);
-    color: ${theme.colors.primary};
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.sm};
-    border-color: ${theme.colors.primary}30;
+    background: ${props => props.theme.colors.gray[100]};
+    color: ${props => props.theme.colors.text};
   }
   
   &:active {
-    transform: translateY(0);
-  }
-  
-  &:disabled {
-    cursor: default;
-    background: rgba(26, 26, 26, 0.02);
-    
-    &:hover {
-      background: rgba(26, 26, 26, 0.02);
-      color: inherit;
-      transform: none;
-      box-shadow: none;
-      border-color: rgba(26, 26, 26, 0.1);
-    }
+    transform: scale(0.95);
   }
 `;
 
-const Separator = styled(FiChevronRight)`
-  color: ${theme.colors.gray[500]};
-  font-size: 1.125rem;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+const BreadcrumbSeparator = styled.span`
+  color: ${props => props.theme.colors.gray[400]};
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
 `;
 
-const HomeIcon = styled(FiHome)`
-  font-size: 1.125rem;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
-`;
-
-const PathText = styled.span`
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  
-  @media (max-width: ${theme.breakpoints.sm}) {
-    max-width: 100px;
-  }
+const CurrentPath = styled.span`
+  color: ${props => props.theme.colors.text};
+  font-weight: 600;
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  background: ${props => props.theme.colors.gray[100]};
+  border-radius: ${props => props.theme.borderRadius.sm};
+  font-size: 0.875rem;
 `;
 
 export const Breadcrumb = ({ currentPath, onNavigate }) => {
@@ -146,7 +98,7 @@ export const Breadcrumb = ({ currentPath, onNavigate }) => {
             disabled={currentPath === ''}
             title="Go to root folder"
           >
-            <HomeIcon />
+            <FiHome />
             <span>Home</span>
           </BreadcrumbLink>
         </BreadcrumbItem>
@@ -158,15 +110,20 @@ export const Breadcrumb = ({ currentPath, onNavigate }) => {
           
           return (
             <React.Fragment key={path}>
-              <Separator />
+              <BreadcrumbSeparator>
+                <FiChevronRight />
+              </BreadcrumbSeparator>
               <BreadcrumbItem>
-                <BreadcrumbLink
-                  onClick={() => !isLast && onNavigate(path)}
-                  disabled={isLast}
-                  title={isLast ? 'Current folder' : `Go to ${segment}`}
-                >
-                  <PathText>{decodeURIComponent(segment)}</PathText>
-                </BreadcrumbLink>
+                {isLast ? (
+                  <CurrentPath>{decodeURIComponent(segment)}</CurrentPath>
+                ) : (
+                  <BreadcrumbLink
+                    onClick={() => onNavigate(path)}
+                    title={`Go to ${segment}`}
+                  >
+                    {decodeURIComponent(segment)}
+                  </BreadcrumbLink>
+                )}
               </BreadcrumbItem>
             </React.Fragment>
           );

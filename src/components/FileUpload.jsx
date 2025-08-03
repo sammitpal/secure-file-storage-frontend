@@ -1,383 +1,414 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import styled, { keyframes } from 'styled-components';
-import { FiUploadCloud, FiFile, FiX, FiCheck, FiAlertTriangle } from 'react-icons/fi';
-import { motion, AnimatePresence } from 'framer-motion';
-import { fileApi } from '../services/api.js';
-import { useAuth } from '../contexts/AuthContext.jsx';
-import { theme } from '../styles/GlobalStyles.js';
+import { 
+  FiUploadCloud, 
+  FiFile, 
+  FiX, 
+  FiCheck, 
+  FiAlertTriangle,
+  FiImage,
+  FiFileText,
+  FiMusic,
+  FiVideo,
+  FiArchive,
+  FiCode,
+  FiDatabase 
+} from 'react-icons/fi';
 import { toast } from 'react-toastify';
+import { fileApi, formatFileSize } from '../services/api.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { useTheme } from '../contexts/ThemeContext.jsx';
 
+// Simple spin animation only
+const spin = keyframes`
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+`;
+
+// Pulse animation for upload icon
 const pulse = keyframes`
-  0%, 100% { 
-    opacity: 1; 
-    box-shadow: 0 0 20px rgba(26, 26, 26, 0.1), 0 0 40px rgba(26, 26, 26, 0.05);
+  0%, 100% {
+    box-shadow: 
+      0 8px 32px rgba(102, 126, 234, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.1);
   }
-  50% { 
-    opacity: 0.95; 
-    box-shadow: 0 0 40px rgba(26, 26, 26, 0.2), 0 0 80px rgba(26, 26, 26, 0.1);
+  50% {
+    box-shadow: 
+      0 12px 40px rgba(102, 126, 234, 0.6),
+      0 0 0 1px rgba(255, 255, 255, 0.2);
   }
 `;
 
-const shimmerGlow = keyframes`
-  0% { 
-    background-position: -200% center;
+// File type detection and icon mapping (same as FileList)
+const getFileTypeInfo = (fileName) => {
+  const extension = fileName.toLowerCase().split('.').pop();
+  
+  // Image files
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(extension)) {
+    return {
+      icon: FiImage,
+      color: '#10b981', // Green
+      background: '#10b98120',
+      category: 'image'
+    };
   }
-  100% { 
-    background-position: 200% center;
+  
+  // Document files
+  if (['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'].includes(extension)) {
+    return {
+      icon: FiFileText,
+      color: '#3b82f6', // Blue
+      background: '#3b82f620',
+      category: 'document'
+    };
   }
-`;
+  
+  // Spreadsheet files
+  if (['csv', 'xls', 'xlsx', 'ods'].includes(extension)) {
+    return {
+      icon: FiDatabase,
+      color: '#059669', // Dark green
+      background: '#05966920',
+      category: 'spreadsheet'
+    };
+  }
+  
+  // Audio files
+  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'].includes(extension)) {
+    return {
+      icon: FiMusic,
+      color: '#8b5cf6', // Purple
+      background: '#8b5cf620',
+      category: 'audio'
+    };
+  }
+  
+  // Video files
+  if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm'].includes(extension)) {
+    return {
+      icon: FiVideo,
+      color: '#ef4444', // Red
+      background: '#ef444420',
+      category: 'video'
+    };
+  }
+  
+  // Archive files
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(extension)) {
+    return {
+      icon: FiArchive,
+      color: '#f59e0b', // Amber
+      background: '#f59e0b20',
+      category: 'archive'
+    };
+  }
+  
+  // Code files
+  if (['js', 'jsx', 'ts', 'tsx', 'html', 'css', 'scss', 'py', 'java', 'cpp', 'c', 'php', 'rb', 'go', 'rs'].includes(extension)) {
+    return {
+      icon: FiCode,
+      color: '#6366f1', // Indigo
+      background: '#6366f120',
+      category: 'code'
+    };
+  }
+  
+  // Default file icon
+  return {
+    icon: FiFile,
+    color: '#6b7280', // Gray
+    background: '#6b728020',
+    category: 'other'
+  };
+};
 
 const DropzoneContainer = styled.div`
   border: 3px dashed ${props => 
-    props.isDragReject ? theme.colors.danger : 
-    props.isDragActive ? theme.colors.primary : 
-    theme.colors.gray[300]
+    props.isDragReject ? props.theme.colors.danger : 
+    props.isDragActive ? props.theme.colors.primary : 
+    props.theme.colors.gray[300]
   };
-  border-radius: ${theme.borderRadius.xl};
-  padding: ${theme.spacing['2xl']};
+  border-radius: ${props => props.theme.borderRadius.xl};
+  padding: ${props => props.theme.spacing['2xl']};
   text-align: center;
   cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s ease;
   background: ${props => 
-    props.isDragActive ? 
-      `linear-gradient(135deg, rgba(26, 26, 26, 0.05), rgba(26, 26, 26, 0.02))` : 
-      `rgba(255, 255, 255, 0.9)`
+    props.isDragReject ? props.theme.colors.danger + '10' :
+    props.isDragActive ? props.theme.colors.gray[100] :
+    props.theme.colors.surface
   };
-  backdrop-filter: blur(10px);
+  box-shadow: ${props => 
+    props.isDragActive ? props.theme.shadows.xl : props.theme.shadows.md
+  };
+  transform: ${props => props.isDragActive ? 'scale(1.02)' : 'none'};
+  
+  &:hover {
+    border-color: ${props => props.theme.colors.primary};
+    background: ${props => props.theme.colors.gray[50]};
+    transform: translateY(-2px);
+    box-shadow: ${props => props.theme.shadows.lg};
+  }
+`;
+
+const UploadIcon = styled.div`
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  margin: 0 auto ${props => props.theme.spacing.lg};
+  box-shadow: 
+    0 8px 32px rgba(102, 126, 234, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
   position: relative;
-  overflow: hidden;
-  box-shadow: ${theme.shadows.md};
   
   &::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.4),
-      transparent
-    );
-    transition: left 0.8s ease;
+    inset: -2px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2, #f093fb, #f5576c, #4facfe);
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
   }
-
+  
   &:hover {
-    border-color: ${theme.colors.primary};
-    background: ${props => 
-      props.isDragActive ? 
-        `linear-gradient(135deg, rgba(26, 26, 26, 0.08), rgba(26, 26, 26, 0.04))` : 
-        `rgba(255, 255, 255, 0.95)`
-    };
-    transform: translateY(-2px);
-    box-shadow: ${theme.shadows.xl};
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 
+      0 12px 40px rgba(102, 126, 234, 0.6),
+      0 0 0 1px rgba(255, 255, 255, 0.2);
     
     &::before {
-      left: 100%;
+      opacity: 1;
     }
   }
-
-  ${props => props.isDragActive && `
-    animation: ${pulse} 1.5s infinite;
-    transform: scale(1.02) translateY(-4px);
-    border-color: ${theme.colors.primary};
-    background: linear-gradient(
-      135deg,
-      rgba(26, 26, 26, 0.05) 0%,
-      rgba(26, 26, 26, 0.08) 50%,
-      rgba(26, 26, 26, 0.05) 100%
-    );
-    background-size: 200% 200%;
-    animation: ${pulse} 1.5s infinite, ${shimmerGlow} 2s infinite;
-    box-shadow: 
-      0 12px 48px rgba(26, 26, 26, 0.15),
-      inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  `}
   
-  ${props => props.isDragReject && `
-    border-color: ${theme.colors.danger};
-    background: rgba(239, 68, 68, 0.05);
-    color: ${theme.colors.danger};
-  `}
-`;
-
-const UploadIcon = styled(FiUploadCloud)`
-  font-size: 5rem;
-  color: ${props => props.isDragActive ? theme.colors.primary : theme.colors.gray[400]};
-  margin-bottom: ${theme.spacing.lg};
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
-  
-  ${props => props.isDragActive && `
-    color: ${theme.colors.primary};
-    transform: scale(1.1) translateY(-4px);
-    filter: drop-shadow(0 8px 25px rgba(26, 26, 26, 0.2));
-  `}
+  /* Subtle pulse animation */
+  animation: ${pulse} 3s ease-in-out infinite;
 `;
 
 const UploadText = styled.div`
   h3 {
     font-size: 1.5rem;
-    font-weight: 700;
-    color: ${theme.colors.primary};
-    margin-bottom: ${theme.spacing.md};
-    letter-spacing: -0.025em;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    font-weight: 600;
+    color: ${props => props.theme.colors.text};
+    margin-bottom: ${props => props.theme.spacing.sm};
   }
-
+  
   p {
-    color: ${theme.colors.gray[600]};
-    font-size: 1rem;
-    line-height: 1.6;
-    font-weight: 500;
+    color: ${props => props.theme.colors.textSecondary};
+    margin-bottom: ${props => props.theme.spacing.md};
+    font-size: 0.875rem;
   }
+  
+  .file-limit {
+    font-size: 0.75rem;
+    color: ${props => props.theme.colors.gray[500]};
+    margin-top: ${props => props.theme.spacing.sm};
+  }
+`;
 
-  .highlight {
-    color: ${theme.colors.primary};
-    font-weight: 700;
-    text-decoration: underline;
-    text-decoration-color: rgba(26, 26, 26, 0.3);
-    text-underline-offset: 2px;
+const UploadButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${props => props.theme.spacing.sm};
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+  border-radius: ${props => props.theme.borderRadius.lg};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+  }
+  
+  &:disabled {
+    background: ${props => props.theme.colors.gray[400]};
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
   }
 `;
 
 const FileList = styled.div`
-  margin-top: ${theme.spacing.lg};
+  margin-top: ${props => props.theme.spacing.xl};
+  padding-top: ${props => props.theme.spacing.xl};
+  border-top: 1px solid ${props => props.theme.colors.border};
 `;
 
-const FileItem = styled(motion.div)`
+const FileItem = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
-  background: ${props => {
-    switch (props.status) {
-      case 'uploading': return theme.colors.info + '10';
-      case 'success': return theme.colors.success + '10';
-      case 'error': return theme.colors.danger + '10';
-      default: return theme.colors.gray[50];
-    }
-  }};
-  border: 1px solid ${props => {
-    switch (props.status) {
-      case 'uploading': return theme.colors.info + '30';
-      case 'success': return theme.colors.success + '30';
-      case 'error': return theme.colors.danger + '30';
-      default: return theme.colors.gray[200];
-    }
-  }};
-  border-radius: ${theme.borderRadius.md};
-  margin-bottom: ${theme.spacing.xs};
+  padding: ${props => props.theme.spacing.md};
+  background: ${props => props.theme.colors.gray[50]};
+  border-radius: ${props => props.theme.borderRadius.md};
+  margin-bottom: ${props => props.theme.spacing.sm};
+  border: 1px solid ${props => props.theme.colors.border};
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
 `;
 
 const FileInfo = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.sm};
+  gap: ${props => props.theme.spacing.md};
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+`;
 
-  .file-icon {
-    font-size: 1.25rem;
-    color: ${theme.colors.primary};
-  }
-
-  .file-details {
-    flex: 1;
-    
-    .file-name {
-      font-weight: 500;
-      color: ${theme.colors.gray[700]};
-      font-size: 0.875rem;
-    }
-    
-    .file-size {
-      font-size: 0.75rem;
-      color: ${theme.colors.gray[500]};
-    }
+const FileIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: ${props => props.theme.borderRadius.md};
+  background: ${props => props.iconBackground || 'linear-gradient(135deg, #8b5cf6, #7c3aed)'};
+  color: ${props => props.iconColor || 'white'};
+  font-size: 1rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+  transition: transform 0.2s ease;
+  
+  &:hover {
+    transform: scale(1.05);
   }
 `;
 
-const LoadingSpinner = styled.div`
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+const FileDetails = styled.div`
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
   
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
+  .name {
+    font-weight: 500;
+    color: ${props => props.theme.colors.text};
+    font-size: 0.875rem;
+    margin-bottom: 2px;
+    word-break: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+  }
+  
+  .size {
+    font-size: 0.75rem;
+    color: ${props => props.theme.colors.textSecondary};
+    white-space: nowrap;
   }
 `;
 
 const FileStatus = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.xs};
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: ${props => {
-    switch (props.status) {
-      case 'uploading': return theme.colors.info;
-      case 'success': return theme.colors.success;
-      case 'error': return theme.colors.danger;
-      default: return theme.colors.gray[500];
-    }
-  }};
+  gap: ${props => props.theme.spacing.sm};
+  flex-shrink: 0;
 `;
 
-const ProgressBar = styled.div`
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  height: 4px;
-  background: linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.secondary});
-  width: ${props => props.progress || 0}%;
-  transition: width 0.3s ease;
-  border-radius: 0 0 ${theme.borderRadius.md} ${theme.borderRadius.md};
-  opacity: ${props => props.progress > 0 ? 1 : 0};
+const StatusIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 0.875rem;
   
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-    animation: ${props => props.progress > 0 && props.progress < 100 ? 'shimmer 2s infinite' : 'none'};
+  &.uploading {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    animation: ${spin} 1s linear infinite;
   }
   
-  @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+  &.success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
   }
+  
+  &.error {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  }
+  
+  ${spin}
 `;
 
 const RemoveButton = styled.button`
-  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   border: none;
-  color: ${theme.colors.gray[400]};
+  border-radius: 50%;
+  background: ${props => props.theme.colors.gray[200]};
+  color: ${props => props.theme.colors.textSecondary};
   cursor: pointer;
-  padding: ${theme.spacing.xs};
-  border-radius: ${theme.borderRadius.sm};
   transition: all 0.2s ease;
-
-  &:hover {
-    color: ${theme.colors.danger};
-    background: ${theme.colors.danger}10;
+  
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
   }
-
+  
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
 `;
 
-const UploadButton = styled.button`
+const ProgressBar = styled.div`
   width: 100%;
-  padding: ${theme.spacing.md} ${theme.spacing.lg};
-  background: linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.secondary} 100%);
-  color: white;
-  border: none;
-  border-radius: ${theme.borderRadius.lg};
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  height: 6px;
+  background: ${props => props.theme.colors.gray[500]};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.full};
   overflow: hidden;
-  box-shadow: 
-    0 8px 16px rgba(26, 26, 26, 0.2),
-    0 2px 4px rgba(26, 26, 26, 0.1);
-  letter-spacing: 0.025em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.3),
-      transparent
-    );
-    transition: left 0.6s ease;
-  }
-
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 
-      0 12px 24px rgba(26, 26, 26, 0.3),
-      0 4px 8px rgba(26, 26, 26, 0.15);
-
-    &::before {
-      left: 100%;
-    }
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(-1px);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: 0 4px 8px rgba(26, 26, 26, 0.1);
-
-    &::before {
-      display: none;
-    }
-  }
+  margin-top: ${props => props.theme.spacing.sm};
 `;
 
-const FileIcon = styled.div`
-  color: ${theme.colors.primary};
-  font-size: 1.25rem;
-  margin-right: ${theme.spacing.sm};
-  filter: drop-shadow(0 1px 2px rgba(26, 26, 26, 0.1));
-`;
-
-const FileDetails = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const FileName = styled.div`
-  font-weight: 600;
-  color: ${theme.colors.primary};
-  font-size: 0.875rem;
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-bottom: 0.25rem;
-`;
-
-const FileSize = styled.div`
-  font-size: 0.75rem;
-  color: ${theme.colors.gray[500]};
-  font-weight: 500;
+const ProgressFill = styled.div`
+  height: 100%;
+  background: ${props => props.theme.colors.primary};
+  width: ${props => props.progress}%;
+  transition: width 0.3s ease;
+  border-radius: ${props => props.theme.borderRadius.full};
 `;
 
 export const FileUpload = ({ currentPath, onUploadComplete }) => {
   const [files, setFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const { hasQuotaSpace, getQuotaInfo } = useAuth();
+  const { theme } = useTheme();
 
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
     onDrop: (acceptedFiles, rejectedFiles) => {
@@ -450,118 +481,90 @@ export const FileUpload = ({ currentPath, onUploadComplete }) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const uploadFiles = async () => {
+  const uploadFiles = useCallback(async () => {
     if (files.length === 0) return;
-
-    // Double-check quota before uploading
-    const totalSize = files.reduce((sum, f) => sum + f.file.size, 0);
-    if (!hasQuotaSpace(totalSize)) {
-      toast.error('Insufficient storage space for upload!');
-      return;
-    }
-
-    setIsUploading(true);
     
-    try {
-      // Update all files to uploading status
-      setFiles(prev => prev.map(f => ({ ...f, status: 'uploading', progress: 0 })));
+    setIsUploading(true);
+    const uploadPromises = files.map(async (fileItem, index) => {
+      try {
+        setFiles(prev => prev.map((f, i) => 
+          i === index ? { ...f, status: 'uploading', progress: 0 } : f
+        ));
 
-      // Upload files sequentially to track individual progress
-      const uploadResults = [];
-      
-      for (let i = 0; i < files.length; i++) {
-        const fileItem = files[i];
-        
-        try {
-          // Upload with progress tracking using the fileApi.uploadWithProgress method
-          const response = await fileApi.uploadWithProgress(
-            [fileItem.file], // Pass as array
-            currentPath,
-            (progress) => {
-              // Update progress for this specific file
-              setFiles(prev => prev.map((f, index) => 
-                index === i ? { ...f, progress: progress } : f
-              ));
-            }
-          );
-
-          if (response.success && response.results && response.results[0]) {
-            const result = response.results[0];
-            uploadResults.push(result);
-            
-            // Mark this file as successful
-            setFiles(prev => prev.map((f, index) => 
-              index === i ? { 
-                ...f, 
-                status: 'success', 
-                progress: 100, 
-                result: result 
-              } : f
+        const response = await fileApi.uploadWithProgress(
+          [fileItem.file],
+          currentPath,
+          (progress) => {
+            setFiles(prev => prev.map((f, i) => 
+              i === index ? { ...f, progress } : f
             ));
-          } else {
-            throw new Error(response.message || 'Upload failed');
           }
-        } catch (error) {
-          console.error(`Upload error for file ${fileItem.file.name}:`, error);
-          
-          // Handle specific error types
-          let errorMessage = 'Upload failed';
-          if (error.response?.status === 413) {
-            errorMessage = 'File too large or insufficient storage quota';
-          } else if (error.response?.data?.message) {
-            errorMessage = error.response.data.message;
-          } else if (error.message) {
-            errorMessage = error.message;
-          }
-          
-          // Mark this file as error
-          setFiles(prev => prev.map((f, index) => 
-            index === i ? { 
-              ...f, 
-              status: 'error', 
-              error: errorMessage 
-            } : f
+        );
+
+        if (response.success) {
+          setFiles(prev => prev.map((f, i) => 
+            i === index ? { ...f, status: 'success', progress: 100 } : f
           ));
-          
-          uploadResults.push({
-            success: false,
-            originalName: fileItem.file.name,
-            error: errorMessage
-          });
+          return { success: true, file: fileItem.file };
+        } else {
+          throw new Error(response.message || 'Upload failed');
+        }
+      } catch (error) {
+        console.error('Upload error for file:', fileItem.file.name, error);
+        
+        // Handle specific S3 configuration errors
+        let errorMessage = error.message || 'Upload failed';
+        
+        if (error.response?.status === 503) {
+          errorMessage = 'File storage service is currently unavailable. Please contact administrator.';
+        } else if (errorMessage.includes('S3 storage is not configured')) {
+          errorMessage = 'File storage is not properly configured. Please contact administrator.';
+        } else if (errorMessage.includes('S3 bucket not found')) {
+          errorMessage = 'Storage configuration error. Please contact administrator.';
+        } else if (errorMessage.includes('S3 access denied')) {
+          errorMessage = 'Storage access error. Please contact administrator.';
+        }
+        
+        setFiles(prev => prev.map((f, i) => 
+          i === index ? { ...f, status: 'error', error: errorMessage } : f
+        ));
+        return { success: false, error: errorMessage, file: fileItem.file };
+      }
+    });
+
+    try {
+      const results = await Promise.allSettled(uploadPromises);
+      const successful = results.filter(r => r.status === 'fulfilled' && r.value.success);
+      const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success));
+
+      if (successful.length > 0) {
+        toast.success(`${successful.length} file(s) uploaded successfully!`);
+        if (onUploadComplete) {
+          onUploadComplete();
         }
       }
 
-      const successCount = uploadResults.filter(r => r.success).length;
-      const failCount = uploadResults.length - successCount;
-
-      if (successCount > 0) {
-        toast.success(`${successCount} file(s) uploaded successfully${failCount > 0 ? `, ${failCount} failed` : ''}`);
-        onUploadComplete();
-      }
-
-      if (failCount > 0 && successCount === 0) {
-        toast.error('All uploads failed');
+      if (failed.length > 0) {
+        const errorMessages = failed.map(r => 
+          r.status === 'rejected' ? r.reason.message : r.value.error
+        );
+        
+        // Show first error message, as they're likely all the same S3 config issue
+        toast.error(errorMessages[0] || `${failed.length} file(s) failed to upload`);
       }
 
       // Clear successful uploads after a delay
       setTimeout(() => {
-        setFiles(prev => prev.filter(f => f.status === 'error'));
+        setFiles(prev => prev.filter(f => f.status !== 'success'));
       }, 3000);
 
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error(error instanceof Error ? error.message : 'Upload failed');
-      
-      // Mark all files as error
-      setFiles(prev => prev.map(f => ({ 
-        ...f, 
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Upload failed'
-      })));
+      console.error('Upload process error:', error);
+      toast.error('Upload process failed. Please try again.');
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [files, currentPath, onUploadComplete]);
 
   // Get quota info for display
   const quotaInfo = getQuotaInfo();
@@ -570,11 +573,17 @@ export const FileUpload = ({ currentPath, onUploadComplete }) => {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'uploading':
-        return <LoadingSpinner />;
+        return <StatusIcon className="uploading">
+          <FiUploadCloud />
+        </StatusIcon>;
       case 'success':
-        return <FiCheck />;
+        return <StatusIcon className="success">
+          <FiCheck />
+        </StatusIcon>;
       case 'error':
-        return <FiX />;
+        return <StatusIcon className="error">
+          <FiX />
+        </StatusIcon>;
       default:
         return null;
     }
@@ -604,7 +613,9 @@ export const FileUpload = ({ currentPath, onUploadComplete }) => {
         isDragReject={isDragReject}
       >
         <input {...getInputProps()} />
-        <UploadIcon isDragActive={isDragActive} />
+        <UploadIcon>
+          <FiUploadCloud />
+        </UploadIcon>
         <UploadText>
           {isDragActive ? (
             isDragReject ? (
@@ -621,8 +632,8 @@ export const FileUpload = ({ currentPath, onUploadComplete }) => {
           ) : (
             <div>
               <h3>Drag & drop files here</h3>
-              <p>or <span className="highlight">click to browse</span></p>
-              <small>Maximum 10MB per file • 20 files max</small>
+              <p>or <span className="supported-formats">click to browse</span></p>
+              <small className="file-limit">Maximum 10MB per file • 20 files max</small>
             </div>
           )}
         </UploadText>
@@ -630,14 +641,12 @@ export const FileUpload = ({ currentPath, onUploadComplete }) => {
 
       {/* Quota Warning */}
       {wouldExceedQuota && files.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
+        <div
           style={{
             marginTop: '1rem',
             padding: '1rem',
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
+            background: theme.colors.danger + '20',
+            border: `1px solid ${theme.colors.danger}40`,
             borderRadius: theme.borderRadius.lg,
             display: 'flex',
             alignItems: 'center',
@@ -654,22 +663,20 @@ export const FileUpload = ({ currentPath, onUploadComplete }) => {
               Remove some files or upgrade your storage.
             </small>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Quota Display */}
       {files.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
+        <div
           style={{
             marginTop: '1rem',
             padding: '1rem',
-            background: 'rgba(248, 250, 252, 0.8)',
-            border: '1px solid rgba(226, 232, 240, 0.5)',
+            background: theme.colors.surface,
+            border: `1px solid ${theme.colors.border}`,
             borderRadius: theme.borderRadius.lg,
             fontSize: '0.875rem',
-            color: theme.colors.gray[600]
+            color: theme.colors.text
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -677,9 +684,10 @@ export const FileUpload = ({ currentPath, onUploadComplete }) => {
             <span>Available: <strong>{formatFileSize(quotaInfo.remainingQuota)}</strong></span>
           </div>
           <div style={{ 
-            height: '4px', 
-            background: theme.colors.gray[200], 
-            borderRadius: '2px',
+            height: '6px', 
+            background: theme.colors.gray[500], 
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: '4px',
             overflow: 'hidden'
           }}>
             <div
@@ -687,81 +695,82 @@ export const FileUpload = ({ currentPath, onUploadComplete }) => {
                 height: '100%',
                 width: `${Math.min((totalFilesSize / quotaInfo.remainingQuota) * 100, 100)}%`,
                 background: wouldExceedQuota ? theme.colors.danger : theme.colors.success,
-                transition: 'width 0.3s ease'
+                transition: 'width 0.3s ease',
+                borderRadius: '4px'
               }}
             />
           </div>
-        </motion.div>
+        </div>
       )}
 
-      <AnimatePresence>
-        {files.length > 0 && (
-          <FileList>
-            {files.map((fileItem, index) => (
-              <motion.div
-                key={`${fileItem.file.name}-${index}`}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <FileItem>
-                  <FileInfo>
-                    <FileIcon>
-                      <FiFile />
-                    </FileIcon>
-                    <FileDetails>
-                      <FileName>{fileItem.file.name}</FileName>
-                      <FileSize>{formatFileSize(fileItem.file.size)}</FileSize>
-                      <FileStatus status={fileItem.status}>
-                        {getStatusIcon(fileItem.status)}
-                        {getStatusText(fileItem.status, fileItem.error, fileItem.progress)}
-                      </FileStatus>
-                    </FileDetails>
-                  </FileInfo>
-                  
-                  {fileItem.status === 'uploading' && (
-                    <ProgressBar progress={fileItem.progress}>
-                      <div className="progress" />
-                    </ProgressBar>
-                  )}
-                  
-                  <RemoveButton
-                    onClick={() => removeFile(index)}
-                    disabled={isUploading}
+      {files.length > 0 && (
+        <FileList>
+          {files.map((fileItem, index) => {
+            const { icon: Icon, color, background, category } = getFileTypeInfo(fileItem.file.name);
+            return (
+              <FileItem key={`${fileItem.file.name}-${index}`}>
+                <FileInfo>
+                  <FileIcon 
+                    iconBackground={background} 
+                    iconColor={color}
                   >
-                    <FiX />
-                  </RemoveButton>
-                </FileItem>
-              </motion.div>
-            ))}
-          </FileList>
-        )}
-      </AnimatePresence>
+                    <Icon />
+                  </FileIcon>
+                  <FileDetails>
+                    <div className="name">{fileItem.file.name}</div>
+                    <div className="size">{formatFileSize(fileItem.file.size)}</div>
+                    {fileItem.status === 'uploading' && (
+                      <ProgressBar>
+                        <ProgressFill progress={fileItem.progress} />
+                      </ProgressBar>
+                    )}
+                  </FileDetails>
+                </FileInfo>
+                
+                <FileStatus>
+                  {fileItem.status === 'uploading' ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {getStatusIcon(fileItem.status)}
+                      <span style={{ fontSize: '0.875rem', color: theme.colors.textSecondary }}>
+                        {Math.round(fileItem.progress)}%
+                      </span>
+                    </div>
+                  ) : fileItem.status === 'success' || fileItem.status === 'error' ? (
+                    getStatusIcon(fileItem.status)
+                  ) : (
+                    <RemoveButton
+                      onClick={() => removeFile(index)}
+                      disabled={isUploading}
+                    >
+                      <FiX />
+                    </RemoveButton>
+                  )}
+                </FileStatus>
+              </FileItem>
+            );
+          })}
+        </FileList>
+      )}
 
       {files.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          style={{ marginTop: theme.spacing.lg }}
+        <UploadButton
+          onClick={uploadFiles}
+          disabled={isUploading || files.length === 0 || wouldExceedQuota}
         >
-          <UploadButton
-            onClick={uploadFiles}
-            disabled={isUploading || files.length === 0 || wouldExceedQuota}
-          >
-            {isUploading ? (
-              <>
-                <LoadingSpinner />
-                Uploading...
-              </>
-            ) : (
-              <>
+          {isUploading ? (
+            <>
+              <StatusIcon className="uploading">
                 <FiUploadCloud />
-                Upload {files.length} file{files.length !== 1 ? 's' : ''}
-              </>
-            )}
-          </UploadButton>
-        </motion.div>
+              </StatusIcon>
+              Uploading...
+            </>
+          ) : (
+            <>
+              <FiUploadCloud />
+              Upload {files.length} file{files.length !== 1 ? 's' : ''}
+            </>
+          )}
+        </UploadButton>
       )}
     </div>
   );

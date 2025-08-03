@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { motion, AnimatePresence } from 'framer-motion';
 import { FiFolder, FiX, FiPlus } from 'react-icons/fi';
 import { folderApi } from '../services/api.js';
-import { theme, Button, Input } from '../styles/GlobalStyles.js';
 import { toast } from 'react-toastify';
+import { useTheme } from '../contexts/ThemeContext.jsx';
 
-const Overlay = styled(motion.div)`
+const Overlay = styled.div`
   position: fixed;
   top: 0;
   left: 0;
@@ -17,109 +16,200 @@ const Overlay = styled(motion.div)`
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: ${theme.spacing.md};
+  padding: ${props => props.theme.spacing.md};
 `;
 
-const Modal = styled(motion.div)`
-  background: white;
-  border-radius: ${theme.borderRadius.lg};
-  box-shadow: ${theme.shadows.xl};
+const Modal = styled.div`
+  background: ${props => props.theme.colors.surface};
+  border-radius: ${props => props.theme.borderRadius.lg};
+  box-shadow: ${props => props.theme.shadows.xl};
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
+  border: 1px solid ${props => props.theme.colors.border};
 `;
 
 const ModalHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: ${theme.spacing.lg};
-  border-bottom: 1px solid ${theme.colors.gray[200]};
+  padding: ${props => props.theme.spacing.lg};
+  border-bottom: 1px solid ${props => props.theme.colors.border};
 `;
 
 const ModalTitle = styled.h2`
   font-size: 1.25rem;
   font-weight: 600;
-  color: ${theme.colors.gray[800]};
+  color: ${props => props.theme.colors.text};
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.sm};
+  gap: ${props => props.theme.spacing.sm};
 
   .icon {
-    color: ${theme.colors.primary};
+    color: ${props => props.theme.colors.primary};
   }
 `;
 
 const CloseButton = styled.button`
   background: none;
   border: none;
-  color: ${theme.colors.gray[400]};
+  color: ${props => props.theme.colors.textSecondary};
   cursor: pointer;
-  padding: ${theme.spacing.xs};
-  border-radius: ${theme.borderRadius.sm};
+  padding: ${props => props.theme.spacing.xs};
+  border-radius: ${props => props.theme.borderRadius.sm};
   transition: all 0.2s ease;
 
   &:hover {
-    color: ${theme.colors.gray[600]};
-    background: ${theme.colors.gray[100]};
+    color: ${props => props.theme.colors.text};
+    background: ${props => props.theme.colors.gray[100]};
   }
 `;
 
 const ModalBody = styled.div`
-  padding: ${theme.spacing.lg};
+  padding: ${props => props.theme.spacing.lg};
 `;
 
 const FormGroup = styled.div`
-  margin-bottom: ${theme.spacing.lg};
+  margin-bottom: ${props => props.theme.spacing.lg};
 `;
 
 const Label = styled.label`
   display: block;
   font-weight: 500;
-  color: ${theme.colors.gray[700]};
-  margin-bottom: ${theme.spacing.sm};
+  color: ${props => props.theme.colors.text};
+  margin-bottom: ${props => props.theme.spacing.sm};
   font-size: 0.875rem;
 `;
 
 const CurrentPathInfo = styled.div`
-  background: ${theme.colors.gray[50]};
-  border: 1px solid ${theme.colors.gray[200]};
-  border-radius: ${theme.borderRadius.md};
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
+  background: ${props => props.theme.colors.gray[100]};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
   font-size: 0.875rem;
-  color: ${theme.colors.gray[600]};
-  margin-bottom: ${theme.spacing.md};
+  color: ${props => props.theme.colors.textSecondary};
+  margin-bottom: ${props => props.theme.spacing.md};
 
   .path {
     font-family: monospace;
-    background: white;
+    background: ${props => props.theme.colors.surface};
     padding: 2px 6px;
     border-radius: 4px;
     font-weight: 500;
+    color: ${props => props.theme.colors.text};
   }
 `;
 
 const ModalFooter = styled.div`
   display: flex;
-  gap: ${theme.spacing.sm};
+  gap: ${props => props.theme.spacing.sm};
   justify-content: flex-end;
-  padding: ${theme.spacing.lg};
-  border-top: 1px solid ${theme.colors.gray[200]};
-  background: ${theme.colors.gray[50]};
-  border-radius: 0 0 ${theme.borderRadius.lg} ${theme.borderRadius.lg};
-`;
-
-const CreateFolderButton = styled(Button)`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
+  padding: ${props => props.theme.spacing.lg};
+  border-top: 1px solid ${props => props.theme.colors.border};
+  background: ${props => props.theme.colors.gray[50]};
+  border-radius: 0 0 ${props => props.theme.borderRadius.lg} ${props => props.theme.borderRadius.lg};
 `;
 
 const ErrorMessage = styled.div`
-  color: ${theme.colors.danger};
+  color: ${props => props.theme.colors.danger};
   font-size: 0.875rem;
-  margin-top: ${theme.spacing.xs};
+  margin-top: ${props => props.theme.spacing.xs};
+`;
+
+const TipsSection = styled.div`
+  font-size: 0.875rem;
+  color: ${props => props.theme.colors.textSecondary};
+  
+  ul {
+    margin-top: ${props => props.theme.spacing.xs};
+    padding-left: 1.2em;
+  }
+`;
+
+const ThemedInput = styled.input`
+  width: 100%;
+  padding: ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: 0.875rem;
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  transition: border-color 0.2s ease;
+  
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.primary};
+    box-shadow: 0 0 0 3px ${props => props.theme.colors.primary}20;
+  }
+  
+  &::placeholder {
+    color: ${props => props.theme.colors.textSecondary};
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+const CancelButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${props => props.theme.spacing.sm};
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid ${props => props.theme.colors.border};
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  
+  &:hover:not(:disabled) {
+    background: ${props => props.theme.colors.gray[100]};
+    border-color: ${props => props.theme.colors.gray[300]};
+    transform: translateY(-1px);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;
+
+const CreateButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${props => props.theme.spacing.sm};
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    background: ${props => props.theme.colors.gray[400]};
+    box-shadow: none;
+  }
 `;
 
 export const FolderCreate = ({
@@ -131,6 +221,7 @@ export const FolderCreate = ({
   const [folderName, setFolderName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
+  const { theme } = useTheme();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -193,93 +284,82 @@ export const FolderCreate = ({
   const displayPath = currentPath || '/';
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <Overlay
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={handleClose}
+    <React.Fragment>
+      <Overlay
+        onClick={handleClose}
+      >
+        <Modal
+          onClick={e => e.stopPropagation()}
         >
-          <Modal
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.2 }}
-            onClick={e => e.stopPropagation()}
-          >
-            <ModalHeader>
-              <ModalTitle>
-                <FiFolder className="icon" />
-                Create New Folder
-              </ModalTitle>
-              <CloseButton onClick={handleClose} title="Close">
-                <FiX size={20} />
-              </CloseButton>
-            </ModalHeader>
+          <ModalHeader>
+            <ModalTitle>
+              <FiFolder className="icon" />
+              Create New Folder
+            </ModalTitle>
+            <CloseButton onClick={handleClose} title="Close">
+              <FiX size={20} />
+            </CloseButton>
+          </ModalHeader>
 
-            <form onSubmit={handleSubmit}>
-              <ModalBody>
-                <CurrentPathInfo>
-                  Create folder in: <span className="path">{displayPath}</span>
-                </CurrentPathInfo>
+          <form onSubmit={handleSubmit}>
+            <ModalBody>
+              <CurrentPathInfo>
+                Create folder in: <span className="path">{displayPath}</span>
+              </CurrentPathInfo>
 
-                <FormGroup>
-                  <Label htmlFor="folderName">Folder Name</Label>
-                  <Input
-                    id="folderName"
-                    type="text"
-                    value={folderName}
-                    onChange={handleInputChange}
-                    placeholder="Enter folder name"
-                    error={!!error}
-                    disabled={isCreating}
-                    autoFocus
-                    maxLength={255}
-                  />
-                  {error && <ErrorMessage>{error}</ErrorMessage>}
-                </FormGroup>
-
-                <div style={{ fontSize: '0.875rem', color: theme.colors.gray[500] }}>
-                  <strong>Tips:</strong>
-                  <ul style={{ marginTop: theme.spacing.xs, paddingLeft: '1.2em' }}>
-                    <li>Use descriptive names for easy organization</li>
-                    <li>Avoid special characters: {'< > : " / \\ | ? *'}</li>
-                    <li>Maximum length: 255 characters</li>
-                  </ul>
-                </div>
-              </ModalBody>
-
-              <ModalFooter>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleClose}
+              <FormGroup>
+                <Label htmlFor="folderName">Folder Name</Label>
+                <ThemedInput
+                  id="folderName"
+                  type="text"
+                  value={folderName}
+                  onChange={handleInputChange}
+                  placeholder="Enter folder name"
+                  error={!!error}
                   disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-                <CreateFolderButton
-                  type="submit"
-                  variant="primary"
-                  disabled={!folderName.trim() || isCreating}
-                >
-                  {isCreating ? (
-                    <>
-                      <span>Creating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FiPlus size={16} />
-                      Create Folder
-                    </>
-                  )}
-                </CreateFolderButton>
-              </ModalFooter>
-            </form>
-          </Modal>
-        </Overlay>
-      )}
-    </AnimatePresence>
+                  autoFocus
+                  maxLength={255}
+                />
+                {error && <ErrorMessage>{error}</ErrorMessage>}
+              </FormGroup>
+
+              <TipsSection>
+                <strong>Tips:</strong>
+                <ul>
+                  <li>Use descriptive names for easy organization</li>
+                  <li>Avoid special characters: {'< > : " / \\ | ? *'}</li>
+                  <li>Maximum length: 255 characters</li>
+                </ul>
+              </TipsSection>
+            </ModalBody>
+
+            <ModalFooter>
+              <CancelButton
+                type="button"
+                onClick={handleClose}
+                disabled={isCreating}
+              >
+                Cancel
+              </CancelButton>
+              <CreateButton
+                type="submit"
+                disabled={!folderName.trim() || isCreating}
+              >
+                {isCreating ? (
+                  <>
+                    <span>Creating...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiPlus size={16} />
+                    Create Folder
+                  </>
+                )}
+              </CreateButton>
+            </ModalFooter>
+          </form>
+        </Modal>
+      </Overlay>
+    </React.Fragment>
   );
 }; 
