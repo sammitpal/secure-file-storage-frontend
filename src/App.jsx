@@ -1,628 +1,462 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import styled from 'styled-components';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { FiRefreshCw, FiPlus, FiUpload, FiHardDrive, FiCloud, FiFolder, FiShield, FiZap, FiSettings, FiFile, FiLock } from 'react-icons/fi';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import styled, { ThemeProvider as StyledThemeProvider } from 'styled-components';
+import { useAuth } from './contexts/AuthContext';
+import { useTheme } from './contexts/ThemeContext';
+import { fileApi } from './services/api';
+import Navbar from './components/Navbar';
+import FileUpload from './components/FileUpload';
+import FileList from './components/FileList';
+import Breadcrumb from './components/Breadcrumb';
+import FolderCreate from './components/FolderCreate';
+import ErrorBoundary from './components/ErrorBoundary';
+import { GlobalStyles } from './styles/GlobalStyles';
 
-import { GlobalStyles, Container, Button } from './styles/GlobalStyles.js';
-import { FileUpload } from './components/FileUpload.jsx';
-import { FileList } from './components/FileList.jsx';
-import { Breadcrumb } from './components/Breadcrumb.jsx';
-import { FolderCreate } from './components/FolderCreate.jsx';
-import { Navbar } from './components/Navbar.jsx';
-import AuthWrapper from './components/AuthWrapper.jsx';
-import { useAuth } from './contexts/AuthContext.jsx';
-import { fileApi, formatFileSize } from './services/api.js';
-import { toast } from 'react-toastify';
+// Modern styled components with glassmorphism
+const AppContainer = styled.div`
+  min-height: 100vh;
+  background: ${props => props.theme?.colors?.background || 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'};
+  position: relative;
+  overflow-x: hidden;
+`;
 
-// Simple spinner animation only
-const spin = `
-  @keyframes spin {
-    to { transform: rotate(360deg); }
+const BackgroundPattern = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.03;
+  background-image: 
+    radial-gradient(circle at 25% 25%, var(--primary) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, var(--secondary) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+`;
+
+const MainLayout = styled.div`
+  position: relative;
+  z-index: 1;
+  padding-top: 80px;
+  min-height: 100vh;
+`;
+
+const Container = styled.div`
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+  
+  @media (max-width: 768px) {
+    padding: var(--space-6) var(--space-4);
   }
 `;
 
-// Simplified styled components without heavy animations
-const AppContainer = styled.div`
-  min-height: 100vh;
-  background: ${props => props.theme.colors.background};
-  padding-top: 80px;
+const ContentGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--space-8);
+  align-items: start;
+  
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
 `;
 
 const MainContent = styled.div`
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: ${props => props.theme.spacing.xl};
-  display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: ${props => props.theme.spacing.xl};
-  min-height: 500px;
-  
-  @media (max-width: ${props => props.theme.breakpoints.lg}) {
-    grid-template-columns: 1fr;
-    gap: ${props => props.theme.spacing.lg};
-  }
-`;
-
-const MainPanel = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.xl};
-  min-width: 300px;
-  min-height: 500px;
+  gap: var(--space-6);
+  min-height: 600px;
 `;
 
-const MiddlePanel = styled.div`
+const Sidebar = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.lg};
-`;
-
-const Header = styled.header`
-  text-align: center;
-  margin-bottom: ${props => props.theme.spacing.xl};
+  gap: var(--space-6);
   
-  h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: ${props => props.theme.colors.text};
-    margin-bottom: ${props => props.theme.spacing.md};
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  p {
-    font-size: 1.125rem;
-    color: ${props => props.theme.colors.textSecondary};
-    max-width: 600px;
-    margin: 0 auto;
+  @media (max-width: 1024px) {
+    order: -1;
   }
 `;
 
-const GlassPanel = styled.div`
-  background: ${props => props.theme.colors.surface};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  box-shadow: ${props => props.theme.shadows.lg};
-  padding: ${props => props.theme.spacing.xl};
-  border: 1px solid ${props => props.theme.colors.border};
-`;
-
-const SidePanel = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.lg};
-  
-  @media (max-width: ${props => props.theme.breakpoints.lg}) {
-    grid-row: 1;
-  }
-`;
-
-const UploadSection = styled.section`
-  background: ${props => props.theme.colors.surface};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  padding: ${props => props.theme.spacing.xl};
-  border: 1px solid ${props => props.theme.colors.border};
-  box-shadow: ${props => props.theme.shadows.md};
-`;
-
-const SectionTitle = styled.h2`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.md};
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: ${props => props.theme.colors.text};
-  margin-bottom: ${props => props.theme.spacing.lg};
-  
-  .icon {
-    color: ${props => props.theme.colors.primary};
-  }
-`;
-
-const QuickStats = styled(GlassPanel)`
-  h3 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: ${props => props.theme.colors.text};
-    margin-bottom: ${props => props.theme.spacing.md};
-    display: flex;
-    align-items: center;
-    gap: ${props => props.theme.spacing.sm};
-  }
-`;
-
-const StatGrid = styled.div`
-  display: grid;
-  gap: ${props => props.theme.spacing.md};
-`;
-
-const StatItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: ${props => props.theme.spacing.md};
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => props.theme.colors.gray[100]};
-  border: 1px solid ${props => props.theme.colors.border};
-  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.05);
-  margin-bottom: ${props => props.theme.spacing.sm};
-  transition: all 0.2s ease;
-  
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: ${props => props.theme.shadows.md};
-  }
-  
-  &:last-child {
-    margin-bottom: 0;
-  }
-  
-  .stat-left {
-    display: flex;
-    align-items: center;
-    gap: ${props => props.theme.spacing.sm};
-  }
-  
-  .stat-icon {
-    width: 20px;
-    height: 20px;
-    color: ${props => props.theme.colors.primary};
-    flex-shrink: 0;
-  }
-  
-  .label {
-    color: ${props => props.theme.colors.textSecondary};
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-  
-  .value {
-    font-weight: 700;
-    color: ${props => props.theme.colors.text};
-    font-size: 0.875rem;
-    padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-    background: ${props => props.theme.colors.gray[200]};
-    border-radius: ${props => props.theme.borderRadius.sm};
-    min-width: 40px;
-    text-align: center;
-  }
-`;
-
-const StorageCard = styled(GlassPanel)`
-  h3 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: ${props => props.theme.colors.text};
-    margin-bottom: ${props => props.theme.spacing.md};
-    display: flex;
-    align-items: center;
-    gap: ${props => props.theme.spacing.sm};
-  }
-`;
-
-const StorageBar = styled.div`
-  width: 100%;
-  height: 8px;
-  background: ${props => props.theme.colors.gray[200]};
-  border-radius: ${props => props.theme.borderRadius.full};
-  overflow: hidden;
-  margin-bottom: ${props => props.theme.spacing.sm};
-`;
-
-const StorageFill = styled.div`
-  height: 100%;
-  background: linear-gradient(90deg, ${props => props.theme.colors.success}, ${props => props.theme.colors.primary});
-  width: ${props => props.percentage}%;
-  transition: width 0.3s ease;
-`;
-
-const StorageText = styled.div`
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.875rem;
-  color: ${props => props.theme.colors.textSecondary};
-  
-  .percentage {
-    font-weight: 600;
-    color: ${props => props.theme.colors.primary};
-  }
-`;
-
-const ActionButtons = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.sm};
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
-
-const ActionButton = styled.button`
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
-  color: white;
-  border: none;
-  border-radius: ${props => props.theme.borderRadius.md};
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.xs};
-  font-size: 0.875rem;
-  font-weight: 600;
-  transition: all 0.15s ease;
+const ModernCard = styled.div`
+  background: ${props => props.theme?.colors?.surface || '#ffffff'}dd;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid ${props => props.theme?.colors?.border || '#e5e7eb'};
+  border-radius: var(--radius-lg);
+  box-shadow: ${props => props.theme?.shadows?.lg || '0 10px 15px -3px rgba(0, 0, 0, 0.1)'};
+  padding: var(--space-8);
+  transition: var(--transition);
   position: relative;
   overflow: hidden;
   
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  }
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: ${props => props.theme?.shadows?.xl || '0 20px 25px -5px rgba(0, 0, 0, 0.1)'};
+    border-color: ${props => props.theme?.colors?.border || '#d1d5db'};
+  }
+`;
+
+const StatsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+`;
+
+const StatCard = styled.div`
+  background: ${props => props.theme?.colors?.surface || '#ffffff'};
+  border: 1px solid ${props => props.theme?.colors?.border || '#e5e7eb'};
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  text-align: center;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+  }
+  
   &:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: ${props => props.theme?.shadows?.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)'};
+    border-color: ${props => props.theme?.colors?.border || '#d1d5db'};
+  }
+`;
+
+const StatIcon = styled.div`
+  width: 48px;
+  height: 48px;
+  margin: 0 auto var(--space-3);
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+`;
+
+const StatValue = styled.div`
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: ${props => props.theme?.colors?.text || '#1a1a1a'};
+  margin-bottom: var(--space-1);
+  letter-spacing: -0.025em;
+`;
+
+const StatLabel = styled.div`
+  font-size: var(--font-size-sm);
+  color: ${props => props.theme?.colors?.textSecondary || '#6b7280'};
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+`;
+
+const ActionsGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+`;
+
+const ActionButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-6);
+  background: ${props => props.theme?.colors?.surface || '#ffffff'};
+  color: ${props => props.theme?.colors?.text || '#1a1a1a'};
+  border: 1px solid ${props => props.theme?.colors?.border || '#e5e7eb'};
+  border-radius: var(--radius);
+  font-weight: 500;
+  font-size: var(--font-size-sm);
+  transition: var(--transition);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s ease;
+  }
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: ${props => props.theme?.shadows?.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)'};
+    border-color: ${props => props.theme?.colors?.border || '#d1d5db'};
+    
+    &::before {
+      left: 100%;
+    }
   }
   
   &:active {
     transform: translateY(0);
   }
   
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.7;
-    transform: none;
+  svg {
+    width: 18px;
+    height: 18px;
   }
 `;
 
-const PrimaryButton = styled(ActionButton)`
-  background: ${props => props.theme.colors.primary};
-  color: white;
+const SectionTitle = styled.h2`
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: ${props => props.theme?.colors?.text || '#1a1a1a'};
+  margin-bottom: var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   
-  &:hover {
-    background: ${props => props.theme.colors.primaryDark};
+  &::before {
+    content: '';
+    width: 4px;
+    height: 24px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 2px;
   }
 `;
 
-const SecondaryButton = styled(ActionButton)`
-  background: #4b5563;
-  color: white;
-  
-  &:hover {
-    background: #374151;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-  
-  &:disabled {
-    background: #6b7280;
-    opacity: 0.6;
-  }
+const BreadcrumbContainer = styled.div`
+  background: ${props => props.theme?.colors?.surface || '#ffffff'};
+  border: 1px solid ${props => props.theme?.colors?.border || '#e5e7eb'};
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-6);
+  margin-bottom: var(--space-6);
+  box-shadow: ${props => props.theme?.shadows?.sm || '0 1px 2px 0 rgba(0, 0, 0, 0.05)'};
 `;
 
-const LoadingSpinner = styled.div`
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid ${props => props.theme.colors.gray[300]};
-  border-radius: 50%;
-  border-top-color: ${props => props.theme.colors.primary};
-  animation: spin 1s ease-in-out infinite;
-  
-  ${spin}
-`;
-
-const FileListSection = styled.section`
-  background: ${props => props.theme.colors.surface};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  padding: ${props => props.theme.spacing.xl};
-  border: 1px solid ${props => props.theme.colors.border};
-  box-shadow: ${props => props.theme.shadows.md};
-`;
-
-const BreadcrumbSection = styled.div`
-  background: ${props => props.theme.colors.surface};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  padding: ${props => props.theme.spacing.lg};
-  border: 1px solid ${props => props.theme.colors.border};
-  box-shadow: ${props => props.theme.shadows.sm};
-`;
-
-const ErrorMessage = styled.div`
-  padding: ${props => props.theme.spacing.xl};
-  text-align: center;
-  color: ${props => props.theme.colors.danger};
-  background: ${props => props.theme.colors.surface};
-  border-radius: ${props => props.theme.borderRadius.md};
-  border: 1px solid ${props => props.theme.colors.danger}20;
-`;
-
-const FileManagerApp = () => {
-  const { user, logout, getQuotaInfo, refreshUserData } = useAuth();
-  const [currentPath, setCurrentPath] = useState('');
+const FileManagerApp = React.memo(() => {
+  const { currentUser } = useAuth();
   const [files, setFiles] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [currentPath, setCurrentPath] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState({ totalFiles: 0, totalSize: 0, totalFolders: 0 });
+  const [showFolderCreate, setShowFolderCreate] = useState(false);
 
-  const loadFiles = useCallback(async (path = '') => {
+  const currentFolderPath = useMemo(() => {
+    const path = currentPath.length === 0 ? '' : currentPath.map(p => p.name).join('/');
+    return path;
+  }, [currentPath]);
+
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      setError('');
+      const response = await fileApi.listFiles(currentFolderPath);
       
-      const response = await fileApi.list(path);
-      
-      if (response.success && response.data) {
-        setFiles(response.data.items);
-      } else {
-        throw new Error(response.message || 'Failed to load files');
+      // Validate response structure
+      if (!response || typeof response !== 'object') {
+        throw new Error('Invalid response format from server');
       }
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch files');
+      }
+      
+      // Validate response data structure
+      if (!response.data || typeof response.data !== 'object') {
+        throw new Error('Invalid data structure in response');
+      }
+      
+      // Set data with proper validation
+      setFiles(Array.isArray(response.data.files) ? response.data.files : []);
+      setFolders(Array.isArray(response.data.folders) ? response.data.folders : []);
+      
+      // Validate and set stats
+      const stats = response.data.stats || {};
+      setStats({
+        totalFiles: typeof stats.totalFiles === 'number' ? stats.totalFiles : 0,
+        totalFolders: typeof stats.totalFolders === 'number' ? stats.totalFolders : 0,
+        totalSize: typeof stats.totalSize === 'number' ? stats.totalSize : 0
+      });
+      
     } catch (error) {
-      console.error('Load files error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load files';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      console.error('Error fetching data:', error);
+      
+      // Set empty state on error
+      setFiles([]);
+      setFolders([]);
+      setStats({ totalFiles: 0, totalSize: 0, totalFolders: 0 });
+      
+      // Show user-friendly error message
+      if (error.message.includes('Network Error') || error.code === 'ECONNABORTED') {
+        console.error('Network error - server might be down');
+      } else if (error.response?.status === 401) {
+        console.error('Authentication error - user might need to log in again');
+      } else if (error.response?.status === 403) {
+        console.error('Permission error - user might not have access');
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentFolderPath]);
 
-  const refreshFiles = useCallback(async () => {
-    try {
-      setRefreshing(true);
-      await loadFiles(currentPath);
-      await refreshUserData();
-      toast.success('Files refreshed successfully');
-    } catch (error) {
-      // Error handling is done in loadFiles
-    } finally {
-      setRefreshing(false);
-    }
-  }, [currentPath, loadFiles, refreshUserData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const handleNavigation = useCallback((path) => {
-    setCurrentPath(path);
-  }, []);
-
-  const handleFolderClick = useCallback((folderPath) => {
-    setCurrentPath(folderPath);
-  }, []);
+  const handleUploadSuccess = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleFolderCreated = useCallback(() => {
-    loadFiles(currentPath);
-  }, [currentPath, loadFiles]);
+    setShowFolderCreate(false);
+    fetchData();
+  }, [fetchData]);
 
-  const handleUploadComplete = useCallback(() => {
-    loadFiles(currentPath);
-    refreshUserData();
-  }, [currentPath, loadFiles, refreshUserData]);
+  const handleNavigate = useCallback((folderId, folderName) => {
+    setCurrentPath(prev => {
+      const newPath = [...prev, { id: folderId, name: folderName }];
+      return newPath;
+    });
+  }, []);
 
-  // Load files when path changes
-  useEffect(() => {
-    loadFiles(currentPath);
-  }, [currentPath, loadFiles]);
+  const handleBreadcrumbClick = useCallback((index) => {
+    setCurrentPath(prev => {
+      const newPath = prev.slice(0, index + 1);
+      return newPath;
+    });
+  }, []);
 
-  // Memoized calculations
-  const stats = useMemo(() => {
-    const fileCount = files.filter(item => item.type === 'file').length;
-    const folderCount = files.filter(item => item.type === 'folder').length;
-    const totalSize = files
-      .filter(item => item.type === 'file')
-      .reduce((sum, file) => sum + (file.size || 0), 0);
-
-    return { fileCount, folderCount, totalSize };
-  }, [files]);
-
-  const formatSize = useCallback((bytes) => {
-    if (bytes === 0) return '0 B';
+  const formatFileSize = useCallback((bytes) => {
+    if (!bytes) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }, []);
 
-  // Get quota information
-  const quotaInfo = getQuotaInfo();
-
   return (
-    <>
-      {/* Navigation Bar */}
-      <Navbar />
-      
-      <AppContainer>
+    <AppContainer>
+      <BackgroundPattern />
+      <MainLayout>
+        <Navbar />
         <Container>
-          {/* Header */}
-          <Header>
-            <h1>
-              <FiShield style={{ marginRight: '1rem', verticalAlign: 'middle' }} />
-              Secure File Storage
-            </h1>
-            <p>Your personal cloud storage with advanced security and encryption</p>
-          </Header>
-
-          <MainContent>
-            {/* Main Panel - Primary content */}
-            <MiddlePanel>
-              {/* File Upload Section */}
-              <UploadSection>
-                <SectionTitle>
-                  <FiUpload className="icon" />
-                  Upload Files
-                </SectionTitle>
-                <FileUpload
-                  currentPath={currentPath}
-                  onUploadComplete={handleUploadComplete}
+          <ContentGrid>
+            <MainContent>
+              <BreadcrumbContainer>
+                <Breadcrumb 
+                  currentPath={currentPath} 
+                  onNavigate={handleBreadcrumbClick} 
                 />
-              </UploadSection>
-
-              {/* Breadcrumb Navigation */}
-              <BreadcrumbSection>
-                <Breadcrumb
-                  currentPath={currentPath}
-                  onNavigate={handleNavigation}
+              </BreadcrumbContainer>
+              
+              <ModernCard>
+                <SectionTitle>📤 Upload Files</SectionTitle>
+                <FileUpload 
+                  key={currentFolderPath} // Force re-render when path changes
+                  currentFolderPath={currentFolderPath}
+                  onUploadSuccess={handleUploadSuccess}
                 />
-              </BreadcrumbSection>
+              </ModernCard>
 
-              {/* File List Section */}
-              <FileListSection>
-                <SectionTitle>
-                  <FiFolder className="icon" />
-                  {currentPath ? `Files in ${currentPath.split('/').pop()}` : 'All Files & Folders'}
-                </SectionTitle>
-                
-                {error ? (
-                  <ErrorMessage>
-                    {error}
-                  </ErrorMessage>
-                ) : (
-                  <FileList
-                    files={files}
-                    loading={loading}
-                    currentPath={currentPath}
-                    onFolderClick={handleFolderClick}
-                    onFileDeleted={() => {
-                      loadFiles(currentPath);
-                      refreshUserData();
-                    }}
-                  />
-                )}
-              </FileListSection>
-            </MiddlePanel>
+              <ModernCard>
+                <SectionTitle>📁 Files & Folders</SectionTitle>
+                <FileList
+                  files={files}
+                  folders={folders}
+                  loading={loading}
+                  onNavigate={handleNavigate}
+                  onRefresh={fetchData}
+                />
+              </ModernCard>
+            </MainContent>
 
-            {/* Right Panel - Stats and Actions */}
-            <SidePanel>
-              {/* Account Storage Display */}
-              <StorageCard>
-                <h3>
-                  <FiHardDrive style={{ fontSize: '1.5rem', color: props => props.theme.colors.primary }} />
-                  Account Storage
-                </h3>
-                
-                <StorageText>
-                  <span>{formatFileSize(quotaInfo.totalSize)}</span>
-                  <span className="percentage">
-                    {quotaInfo.usagePercentage.toFixed(1)}% Full
-                  </span>
-                </StorageText>
-                
-                <StorageBar>
-                  <StorageFill percentage={quotaInfo.usagePercentage} />
-                </StorageBar>
-                
-                <StatGrid>
-                  <StatItem>
-                    <span className="label">Files</span>
-                    <span className="value">{quotaInfo.filesCount}</span>
-                  </StatItem>
-                  <StatItem>
-                    <span className="label">Free</span>
-                    <span className="value">{formatFileSize(quotaInfo.remainingQuota)}</span>
-                  </StatItem>
-                </StatGrid>
-              </StorageCard>
+            <Sidebar>
+              <ModernCard>
+                <SectionTitle>📊 Quick Stats</SectionTitle>
+                <StatsGrid>
+                  <StatCard>
+                    <StatIcon>📄</StatIcon>
+                    <StatValue>{stats.totalFiles}</StatValue>
+                    <StatLabel>Files</StatLabel>
+                  </StatCard>
+                  <StatCard>
+                    <StatIcon>📁</StatIcon>
+                    <StatValue>{stats.totalFolders}</StatValue>
+                    <StatLabel>Folders</StatLabel>
+                  </StatCard>
+                  <StatCard>
+                    <StatIcon>💾</StatIcon>
+                    <StatValue>{formatFileSize(stats.totalSize)}</StatValue>
+                    <StatLabel>Storage</StatLabel>
+                  </StatCard>
+                </StatsGrid>
+              </ModernCard>
 
-              <SectionTitle>
-                <FiZap className="icon" />
-                Quick Stats
-              </SectionTitle>
-              
-              <QuickStats>
-                <StatGrid>
-                  <StatItem>
-                    <div className="stat-left">
-                      <FiFile className="stat-icon" />
-                      <span className="label">Files</span>
-                    </div>
-                    <span className="value">{stats.fileCount}</span>
-                  </StatItem>
-                  <StatItem>
-                    <div className="stat-left">
-                      <FiFolder className="stat-icon" />
-                      <span className="label">Folders</span>
-                    </div>
-                    <span className="value">{stats.folderCount}</span>
-                  </StatItem>
-                  <StatItem>
-                    <div className="stat-left">
-                      <FiHardDrive className="stat-icon" />
-                      <span className="label">Current Folder</span>
-                    </div>
-                    <span className="value">{formatSize(stats.totalSize)}</span>
-                  </StatItem>
-                  <StatItem>
-                    <div className="stat-left">
-                      <FiLock className="stat-icon" />
-                      <span className="label">Encryption</span>
-                    </div>
-                    <span className="value">256-bit</span>
-                  </StatItem>
-                </StatGrid>
-              </QuickStats>
-
-              <SectionTitle>
-                <FiSettings className="icon" />
-                Actions
-              </SectionTitle>
-              
-              <ActionButtons>
-                <PrimaryButton 
-                  onClick={() => {
-                    setIsCreateFolderOpen(true);
-                  }}
-                  type="button"
-                >
-                  <FiPlus />
-                  Create Folder
-                </PrimaryButton>
-                
-                <SecondaryButton 
-                  onClick={() => {
-                    refreshFiles();
-                  }}
-                  disabled={refreshing}
-                  type="button"
-                >
-                  {refreshing ? <LoadingSpinner /> : <FiRefreshCw />}
-                  Refresh
-                </SecondaryButton>
-              </ActionButtons>
-            </SidePanel>
-          </MainContent>
+              <ModernCard>
+                <SectionTitle>⚡ Quick Actions</SectionTitle>
+                <ActionsGrid>
+                  <ActionButton onClick={() => setShowFolderCreate(true)}>
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z" />
+                    </svg>
+                    New Folder
+                  </ActionButton>
+                  <ActionButton onClick={fetchData}>
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z" />
+                    </svg>
+                    Refresh
+                  </ActionButton>
+                </ActionsGrid>
+              </ModernCard>
+            </Sidebar>
+          </ContentGrid>
         </Container>
-      </AppContainer>
+      </MainLayout>
 
-      {/* Create Folder Modal */}
-      {isCreateFolderOpen && (
+      {showFolderCreate && (
         <FolderCreate
-          currentPath={currentPath}
-          onClose={() => setIsCreateFolderOpen(false)}
-          onFolderCreated={() => {
-            setIsCreateFolderOpen(false);
-            loadFiles(currentPath);
-          }}
+          currentFolderPath={currentFolderPath}
+          onClose={() => setShowFolderCreate(false)}
+          onFolderCreated={handleFolderCreated}
         />
       )}
-
-      {/* Toast Container */}
-      <ToastContainer
-        position="bottom-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
-    </>
+    </AppContainer>
   );
-};
+});
 
-const MemorizedFileManagerApp = React.memo(FileManagerApp);
+FileManagerApp.displayName = 'FileManagerApp';
 
-const App = () => {
+function App() {
+  const { theme, isDarkTheme } = useTheme();
+
   return (
-    <>
+    <StyledThemeProvider theme={theme}>
       <GlobalStyles />
-      <AuthWrapper>
-        <MemorizedFileManagerApp />
-      </AuthWrapper>
-    </>
+      <ErrorBoundary>
+        <FileManagerApp />
+      </ErrorBoundary>
+    </StyledThemeProvider>
   );
-};
+}
 
 export default App; 

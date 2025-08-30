@@ -14,18 +14,24 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [hasLoggedOut, setHasLoggedOut] = useState(false);
 
   // Simple logout function
   const handleLogout = async (showToast = true) => {
     try {
-      await authApi.logout();
+      const result = await authApi.logout();
       if (showToast) {
         toast.success('Logged out successfully');
       }
     } catch (error) {
       console.error('Logout error:', error);
+      // Don't show error toast for logout - it's not critical if the API call fails
+      // The important thing is that we clear local state
+      if (showToast) {
+        toast.success('Logged out successfully');
+      }
     }
     
     // Always clear state regardless of API call success
@@ -33,83 +39,52 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setLoading(false);
+    setHasLoggedOut(true); // Set flag to true after explicit logout
   };
 
   // Initialize auth state on app load - run only once
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log('🔄 AuthContext: Starting initialization...');
+      // Skip initialization if user has explicitly logged out
+      if (hasLoggedOut) {
+        setLoading(false);
+        return;
+      }
       
       try {
         const token = authApi.getAuthToken();
         const savedUser = authApi.getCurrentUser();
         
-        console.log('🔍 AuthContext: Token check:', {
-          hasToken: !!token,
-          tokenLength: token ? token.length : 0,
-          tokenPreview: token ? `${token.substring(0, 20)}...` : 'none',
-          hasSavedUser: !!savedUser,
-          savedUserUsername: savedUser ? savedUser.username : 'none'
-        });
-        
         if (token && savedUser) {
-          console.log('✅ AuthContext: Found both token and user, verifying with server...');
-          
           try {
-            console.log('🌐 AuthContext: Making profile API call...');
             const response = await authApi.getProfile();
             
-            console.log('📡 AuthContext: Profile API response:', {
-              success: response?.success,
-              hasData: !!response?.data,
-              hasUser: !!response?.data?.user,
-              username: response?.data?.user?.username,
-              fullResponse: response
-            });
-            
             if (response && response.success && response.data && response.data.user) {
-              console.log('✅ AuthContext: Profile verification successful - setting authenticated state');
               setUser(response.data.user);
               setIsAuthenticated(true);
-              console.log('✅ AuthContext: User state set, authentication complete');
             } else {
-              console.log('❌ AuthContext: Profile verification failed - invalid response structure');
-              console.log('❌ AuthContext: Response details:', JSON.stringify(response, null, 2));
               authApi.clearAuthTokens();
               setUser(null);
               setIsAuthenticated(false);
             }
           } catch (error) {
-            console.error('❌ AuthContext: Profile API call failed:', error);
-            console.error('❌ AuthContext: Error details:', {
-              message: error.message,
-              status: error.response?.status,
-              data: error.response?.data
-            });
-            
             // Don't clear tokens on network errors, might be temporary
             if (error.response?.status === 401) {
-              console.log('❌ AuthContext: 401 error - clearing tokens');
               authApi.clearAuthTokens();
             }
             setUser(null);
             setIsAuthenticated(false);
           }
         } else {
-          console.log('❌ AuthContext: Missing token or user data:', {
-            hasToken: !!token,
-            hasSavedUser: !!savedUser
-          });
           setUser(null);
           setIsAuthenticated(false);
         }
       } catch (error) {
-        console.error('❌ AuthContext: Initialization error:', error);
+        console.error('Auth initialization error:', error);
         setUser(null);
         setIsAuthenticated(false);
       }
       
-      console.log('🏁 AuthContext: Initialization complete, setting loading to false');
       setLoading(false);
     };
 
@@ -118,27 +93,15 @@ export const AuthProvider = ({ children }) => {
 
   const handleLogin = async (credentials) => {
     try {
-      console.log('🔄 AuthContext: Starting login process...');
       setLoading(true);
       const response = await authApi.login(credentials);
       
-      console.log('📡 AuthContext: Login API response:', {
-        success: response.success,
-        hasData: !!response.data,
-        hasUser: !!response.data?.user,
-        username: response.data?.user?.username,
-        fullResponse: response
-      });
-      
       if (response.success) {
-        console.log('✅ AuthContext: Login successful, setting user state...');
         setUser(response.data.user);
         setIsAuthenticated(true);
-        console.log('✅ AuthContext: State updated - isAuthenticated: true');
         toast.success('Login successful! Welcome back.');
         return { success: true, user: response.data.user };
       } else {
-        console.log('❌ AuthContext: Login failed:', response.message);
         const error = response.message || 'Login failed';
         toast.error(error);
         return { success: false, error };
@@ -149,7 +112,6 @@ export const AuthProvider = ({ children }) => {
       toast.error(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
-      console.log('🏁 AuthContext: Login process complete, setting loading to false');
       setLoading(false);
     }
   };
@@ -182,10 +144,8 @@ export const AuthProvider = ({ children }) => {
     try {
       if (!isAuthenticated) return null;
       
-      console.log('AuthContext: Refreshing user data...');
       const response = await authApi.getProfile();
       if (response.success) {
-        console.log('AuthContext: User data refreshed successfully');
         const userData = response.data.user;
         setUser(userData);
         return userData;

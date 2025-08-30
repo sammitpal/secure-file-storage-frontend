@@ -161,9 +161,20 @@ export const authApi = {
 
   // Logout user
   logout: async () => {
-    const response = await api.post('/auth/logout');
-    authApi.clearAuthTokens();
-    return response.data;
+    try {
+      const response = await api.post('/auth/logout');
+      authApi.clearAuthTokens();
+      return response.data;
+    } catch (error) {
+      // If logout fails (e.g., token expired), still clear local tokens
+      authApi.clearAuthTokens();
+      
+      // Return a success response since we've cleared local state
+      return {
+        success: true,
+        message: 'Logged out successfully (local cleanup)'
+      };
+    }
   },
 
   // Get current user profile
@@ -184,7 +195,7 @@ export const authApi = {
 // File API (updated to work with authentication)
 export const fileApi = {
   // Upload files with progress
-  uploadWithProgress: async (files, folderPath = '', onProgress) => {
+  uploadWithProgress: async (files, folderPath = '', onProgress = null) => {
     const formData = new FormData();
     
     files.forEach(file => {
@@ -199,6 +210,7 @@ export const fileApi = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 120000, // 2 minutes for file uploads
       onUploadProgress: (progressEvent) => {
         const percentCompleted = Math.round(
           (progressEvent.loaded * 100) / progressEvent.total
@@ -209,6 +221,17 @@ export const fileApi = {
       },
     });
 
+    return response.data;
+  },
+
+  // Upload single file (for FileUpload component)
+  uploadFile: async (formData) => {
+    const response = await api.post('/files/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 120000, // 2 minutes for file uploads
+    });
     return response.data;
   },
 
@@ -225,12 +248,24 @@ export const fileApi = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 120000, // 2 minutes for file uploads
     });
 
     return response.data;
   },
 
-  // List files
+  // List files (for App.jsx)
+  listFiles: async (folderPath = '') => {
+    const params = {};
+    if (folderPath) {
+      params.path = folderPath;
+    }
+    
+    const response = await api.get('/files/list', { params });
+    return response.data;
+  },
+
+  // List files (original)
   list: async (path = '', limit = 50, offset = 0) => {
     const response = await api.get('/files/list', {
       params: { path, limit, offset }
@@ -238,9 +273,27 @@ export const fileApi = {
     return response.data;
   },
 
-  // Delete file
+  // Delete file (for FileList component)
+  deleteFile: async (fileKey) => {
+    const response = await api.delete(`/files/${encodeURIComponent(fileKey)}`);
+    return response.data;
+  },
+
+  // Delete file (original)
   delete: async (key) => {
     const response = await api.delete(`/files/${encodeURIComponent(key)}`);
+    return response.data;
+  },
+
+  // Delete folder (for FileList component)
+  deleteFolder: async (folderPath) => {
+    const response = await api.delete(`/folders/${encodeURIComponent(folderPath)}`);
+    return response.data;
+  },
+
+  // Create folder (for FolderCreate component)
+  createFolder: async (data) => {
+    const response = await api.post('/folders/create', data);
     return response.data;
   },
 
@@ -253,6 +306,24 @@ export const fileApi = {
   // Get download URL
   getDownloadUrl: async (key) => {
     const response = await api.get(`/files/download/${encodeURIComponent(key)}`);
+    return response.data;
+  },
+
+  // Share file
+  shareFile: async (fileId, options = {}) => {
+    const response = await api.post(`/files/share/${fileId}`, options);
+    return response.data;
+  },
+
+  // Get user's shared files
+  getShares: async () => {
+    const response = await api.get('/files/shares');
+    return response.data;
+  },
+
+  // Deactivate share
+  deactivateShare: async (shareId) => {
+    const response = await api.delete(`/files/share/${shareId}`);
     return response.data;
   }
 };
@@ -423,6 +494,29 @@ export const getFileIcon = (filename) => {
       return '📈';
     default:
       return '📄';
+  }
+};
+
+// Public Share API (no authentication required)
+export const shareApi = {
+  // Access shared file by short code
+  accessShare: async (shortCode) => {
+    const response = await axios.get(`${API_BASE_URL.replace('/api', '')}/share/${shortCode}`);
+    return response.data;
+  },
+
+  // Download shared file
+  downloadShare: async (shortCode) => {
+    const response = await axios.get(`${API_BASE_URL.replace('/api', '')}/share/${shortCode}/download`);
+    return response.data;
+  },
+
+  // Verify password for protected share
+  verifyPassword: async (shortCode, password) => {
+    const response = await axios.post(`${API_BASE_URL.replace('/api', '')}/share/${shortCode}/password`, {
+      password
+    });
+    return response.data;
   }
 };
 

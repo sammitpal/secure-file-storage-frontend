@@ -49,17 +49,8 @@ const AuthWrapper = ({ children }) => {
   const { isAuthenticated, loading, login, register } = useAuth();
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
 
-  // Debug logging to track authentication state
-  console.log('🔍 AuthWrapper render:', {
-    isAuthenticated,
-    loading,
-    authMode,
-    timestamp: new Date().toISOString()
-  });
-
   // Show loading spinner while checking authentication
   if (loading) {
-    console.log('📋 AuthWrapper: Showing loading screen');
     return (
       <LoadingContainer>
         <LoadingCard>
@@ -72,7 +63,6 @@ const AuthWrapper = ({ children }) => {
 
   // Show login/register if not authenticated
   if (!isAuthenticated) {
-    console.log('🔐 AuthWrapper: User not authenticated, showing auth forms');
     const handleSwitchToRegister = () => setAuthMode('register');
     const handleSwitchToLogin = () => setAuthMode('login');
 
@@ -94,7 +84,6 @@ const AuthWrapper = ({ children }) => {
   }
 
   // Show main app if authenticated
-  console.log('✅ AuthWrapper: User authenticated, showing main app');
   return children;
 };
 

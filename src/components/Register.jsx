@@ -59,11 +59,10 @@ const RegisterContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background: ${props => props.theme?.colors?.background || 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'};
   position: relative;
   overflow: hidden;
-
+  
   &::before {
     content: '';
     position: absolute;
@@ -71,11 +70,9 @@ const RegisterContainer = styled.div`
     left: 0;
     right: 0;
     bottom: 0;
-    background: 
-      radial-gradient(circle at 20% 20%, rgba(26, 26, 26, 0.05) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, rgba(26, 26, 26, 0.03) 0%, transparent 50%),
-      linear-gradient(45deg, transparent 49%, rgba(255, 255, 255, 0.1) 50%, transparent 51%);
-    background-size: 100% 100%, 100% 100%, 20px 20px;
+    background-image: 
+      radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
     pointer-events: none;
   }
 `;
@@ -87,42 +84,19 @@ const RegisterCard = styled.div`
   border-radius: 24px;
   padding: 2.5rem;
   width: 100%;
-  max-width: 500px;
+  max-width: 400px;
   box-shadow: 
     0 20px 40px rgba(0, 0, 0, 0.1),
-    0 1px 3px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    0 1px 3px rgba(0, 0, 0, 0.05);
   position: relative;
-  overflow: hidden;
-  animation: ${floatIn} 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.8),
-      transparent
-    );
-    transition: left 0.8s ease;
-  }
-
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: 
-      0 32px 64px rgba(0, 0, 0, 0.15),
-      0 1px 3px rgba(0, 0, 0, 0.05),
-      inset 0 1px 0 rgba(255, 255, 255, 0.6);
-
-    &::before {
-      left: 100%;
-    }
+  z-index: 1;
+  box-sizing: border-box;
+  
+  @media (max-width: 768px) {
+    margin: 1rem;
+    padding: 1.5rem;
+    border-radius: 20px;
+    max-width: calc(100vw - 2rem);
   }
 `;
 
@@ -146,28 +120,30 @@ const LogoIcon = styled(FiShield)`
   animation: ${pulseGlow} 3s ease-in-out infinite;
 `;
 
-const Title = styled.h1`
-  font-size: 1.75rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, ${props => props.theme.colors.primary} 0%, ${props => props.theme.colors.secondary} 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 0.5rem;
-  animation: ${shimmerGlow} 3s ease-in-out infinite;
-  background-size: 200% 100%;
-`;
-
-const Subtitle = styled.p`
-  color: ${props => props.theme.colors.gray[600]};
-  font-size: 0.9rem;
-  line-height: 1.6;
-`;
-
-const Form = styled.form`
+const RegisterForm = styled.form`
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  width: 100%;
+`;
+
+const Title = styled.h1`
+  font-size: 2rem;
+  font-weight: 700;
+  color: ${props => props.theme?.colors?.text || '#1a1a1a'};
+  text-align: center;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #1a1a1a, #4a5568);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+`;
+
+const Subtitle = styled.p`
+  color: ${props => props.theme?.colors?.textSecondary || '#64748b'};
+  text-align: center;
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
 `;
 
 const InputRow = styled.div`
@@ -182,6 +158,7 @@ const InputRow = styled.div`
 
 const InputGroup = styled.div`
   position: relative;
+  width: 100%;
 `;
 
 const InputContainer = styled.div`
@@ -192,54 +169,51 @@ const InputContainer = styled.div`
 
 const InputIcon = styled.div`
   position: absolute;
-  left: 1rem;
-  color: ${props => props.theme.colors.gray[500]};
+  left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: ${props => props.theme?.colors?.textSecondary || '#64748b'};
   font-size: 1rem;
   z-index: 2;
-  pointer-events: none;
-  transition: all 0.3s ease;
+  
+  @media (max-width: 768px) {
+    left: 0.75rem;
+    font-size: 0.9rem;
+  }
 `;
 
 const Input = styled.input`
   width: 100%;
   padding: 0.875rem 0.875rem 0.875rem 2.75rem;
-  border: 2px solid ${props => props.hasError ? props.theme.colors.danger : 'rgba(226, 232, 240, 0.8)'};
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.8);
-  color: ${props => props.theme.colors.primary};
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid ${props => props.$hasError ? props.theme?.colors?.danger || '#ef4444' : 'rgba(226, 232, 240, 0.8)'};
+  border-radius: 12px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
-  box-shadow: 
-    0 4px 6px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-
-  &::placeholder {
-    color: ${props => props.theme.colors.gray[400]};
-    font-weight: 400;
-  }
+  color: ${props => props.theme?.colors?.text || '#1a1a1a'};
+  font-weight: 500;
+  box-sizing: border-box;
 
   &:focus {
     outline: none;
-    border-color: ${props => props.theme.colors.primary};
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 
-      0 8px 16px rgba(0, 0, 0, 0.1),
-      0 0 0 4px rgba(26, 26, 26, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    transform: translateY(-1px);
+    border-color: ${props => props.$hasError ? props.theme?.colors?.danger || '#ef4444' : props.theme?.colors?.primary || '#3b82f6'};
+    box-shadow: 0 0 0 3px ${props => props.$hasError ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)'};
+    background: rgba(255, 255, 255, 1);
+  }
+
+  &::placeholder {
+    color: ${props => props.theme?.colors?.textSecondary || '#94a3b8'};
+    font-weight: 400;
   }
 
   &:hover:not(:focus) {
-    border-color: ${props => props.theme.colors.gray[400]};
-    background: rgba(255, 255, 255, 0.9);
-    transform: translateY(-1px);
+    border-color: ${props => props.$hasError ? props.theme?.colors?.danger || '#ef4444' : 'rgba(59, 130, 246, 0.3)'};
   }
-
-  ${InputContainer}:focus-within ${InputIcon} {
-    color: ${props => props.theme.colors.primary};
-    transform: scale(1.1);
+  
+  @media (max-width: 768px) {
+    padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+    font-size: 16px; /* Prevent zoom on iOS */
   }
 `;
 
@@ -333,27 +307,33 @@ const CheckIcon = styled(FiCheck)`
 
 const RegisterButton = styled.button`
   width: 100%;
-  padding: 1rem 2rem;
-  background: linear-gradient(135deg, ${props => props.theme.colors.success} 0%, #16a34a 100%);
+  padding: 1rem;
+  background: linear-gradient(135deg, ${props => props.theme?.colors?.primary || '#3b82f6'}, ${props => props.theme?.colors?.primaryDark || '#2563eb'});
   color: white;
   border: none;
-  border-radius: 14px;
+  border-radius: 12px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  margin-top: 1rem;
-  box-shadow: 
-    0 8px 16px rgba(34, 197, 94, 0.3),
-    0 2px 4px rgba(34, 197, 94, 0.2);
-  letter-spacing: 0.025em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
   &::before {
     content: '';
     position: absolute;
@@ -361,39 +341,12 @@ const RegisterButton = styled.button`
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.3),
-      transparent
-    );
-    transition: left 0.6s ease;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
   }
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 
-      0 12px 24px rgba(34, 197, 94, 0.4),
-      0 4px 8px rgba(34, 197, 94, 0.25);
-
-    &::before {
-      left: 100%;
-    }
-  }
-
-  &:active {
-    transform: translateY(-1px);
-  }
-
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: 0 4px 8px rgba(34, 197, 94, 0.2);
-
-    &::before {
-      display: none;
-    }
+  
+  &:hover::before {
+    left: 100%;
   }
 `;
 
@@ -445,6 +398,28 @@ const LoginButton = styled.button`
   &:hover {
     background: rgba(26, 26, 26, 0.05);
     transform: translateX(-4px);
+  }
+`;
+
+const SwitchText = styled.p`
+  text-align: center;
+  margin-top: 2rem;
+  color: ${props => props.theme?.colors?.textSecondary || '#64748b'};
+  font-size: 0.9rem;
+`;
+
+const SwitchLink = styled.button`
+  background: none;
+  border: none;
+  color: ${props => props.theme?.colors?.primary || '#3b82f6'};
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    color: ${props => props.theme?.colors?.primaryDark || '#2563eb'};
+    text-decoration: underline;
   }
 `;
 
@@ -585,7 +560,7 @@ const Register = ({ onSwitchToLogin, onRegisterSuccess }) => {
           <Subtitle>Join Secure File Storage with 500MB free storage</Subtitle>
         </Header>
 
-        <Form onSubmit={handleSubmit}>
+        <RegisterForm onSubmit={handleSubmit}>
           <InputRow>
             <InputGroup>
               <InputContainer>
@@ -598,7 +573,7 @@ const Register = ({ onSwitchToLogin, onRegisterSuccess }) => {
                   placeholder="Username"
                   value={formData.username}
                   onChange={handleChange}
-                  hasError={!!errors.username}
+                  $hasError={!!errors.username}
                   autoComplete="username"
                 />
               </InputContainer>
@@ -616,7 +591,7 @@ const Register = ({ onSwitchToLogin, onRegisterSuccess }) => {
                   placeholder="Email address"
                   value={formData.email}
                   onChange={handleChange}
-                  hasError={!!errors.email}
+                  $hasError={!!errors.email}
                   autoComplete="email"
                 />
               </InputContainer>
@@ -635,7 +610,7 @@ const Register = ({ onSwitchToLogin, onRegisterSuccess }) => {
                 placeholder="Password"
                 value={formData.password}
                 onChange={handleChange}
-                hasError={!!errors.password}
+                $hasError={!!errors.password}
                 autoComplete="new-password"
               />
               <PasswordToggle
@@ -691,7 +666,7 @@ const Register = ({ onSwitchToLogin, onRegisterSuccess }) => {
                 placeholder="Confirm password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                hasError={!!errors.confirmPassword}
+                $hasError={!!errors.confirmPassword}
                 autoComplete="new-password"
               />
               <PasswordToggle
@@ -714,7 +689,7 @@ const Register = ({ onSwitchToLogin, onRegisterSuccess }) => {
               </>
             )}
           </RegisterButton>
-        </Form>
+        </RegisterForm>
 
         <LoginLink>
           <LoginText>Already have an account?</LoginText>
