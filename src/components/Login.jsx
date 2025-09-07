@@ -1,35 +1,9 @@
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { FiUser, FiLock, FiEye, FiEyeOff, FiShield, FiArrowRight, FiMail } from 'react-icons/fi';
+import { FiLock, FiEye, FiEyeOff, FiShield, FiArrowRight, FiMail } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
-import { authApi } from '../services/api';
 import { toast } from 'react-toastify';
 
-// Animations
-const shimmerGlow = keyframes`
-  0% {
-    background-position: -100% 0;
-    opacity: 0;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    background-position: 100% 0;
-    opacity: 0;
-  }
-`;
-
-const floatIn = keyframes`
-  0% {
-    opacity: 0;
-    transform: translateY(30px) scale(0.9);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-`;
 
 const pulseGlow = keyframes`
   0%, 100% {

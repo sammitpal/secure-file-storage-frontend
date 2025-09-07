@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = 'https://sw4vjjc110.execute-api.ap-south-1.amazonaws.com/api';
 
 // Create axios instance
 const api = axios.create({
